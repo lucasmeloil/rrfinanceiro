@@ -59,8 +59,8 @@ export const CONFIG_PADRAO: ConfiguracoesApp = {
   chavePixPadrao: 'pix@rrfinanceiro.com.br',
   instrucoesCobranca: 'Favor enviar o comprovante de pagamento respondendo esta mensagem ou pelo e-mail financeiro@rrfinanceiro.com.br',
   modoOffline: false,
-  supabaseUrl: 'https://djqykdfnmbonnohcijwf.supabase.co',
-  supabaseAnonKey: 'sb_publishable_JVEchFVme0KIYWjLrySSSA_XAI-8VI0',
+  supabaseUrl: import.meta.env.VITE_SUPABASE_URL || 'https://djqykdfnmbonnohcijwf.supabase.co',
+  supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_JVEchFVme0KIYWjLrySSSA_XAI-8VI0',
 };
 
 const getTodayIso = () => {
