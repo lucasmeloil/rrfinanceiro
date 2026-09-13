@@ -17,6 +17,7 @@ import {
 import { ParcelaComPessoa, WhatsAppTemplate } from '../../types';
 import { formatCurrency, formatDate, financialEngine } from '../../services/financialEngine';
 import { storageService } from '../../services/storage';
+import { notificationService } from '../../services/notificationService';
 
 interface ModalEnviarMensagemProps {
   isOpen: boolean;
@@ -75,6 +76,12 @@ export const ModalEnviarMensagem: React.FC<ModalEnviarMensagemProps> = ({
     if (!mensagem.trim()) return;
     navigator.clipboard.writeText(mensagem);
     setCopiado(true);
+    notificationService.info(
+      'Mensagem Copiada!',
+      `Texto da cobrança de ${parcela.pessoaNome} pronto para colar onde desejar.`,
+      undefined,
+      'cobranca'
+    );
     setTimeout(() => setCopiado(false), 2500);
   };
 
@@ -96,6 +103,13 @@ export const ModalEnviarMensagem: React.FC<ModalEnviarMensagemProps> = ({
     const url = `https://wa.me/${ddiNumero}?text=${textoCodificado}`;
 
     window.open(url, '_blank');
+
+    notificationService.sucesso(
+      'Cobrança Aberta no WhatsApp!',
+      `Mensagem com chave PIX e detalhes enviada para ${parcela.pessoaNome} (${parcela.pessoaTelefone || telLimpo}).`,
+      { tab: 'cobrancas', label: 'Ver Cobranças' },
+      'cobranca'
+    );
 
     if (onMessageSent) {
       onMessageSent();

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, AlertCircle, Calendar, DollarSign, CreditCard } from 'lucide-react';
 import { ParcelaComPessoa, FormaPagamento } from '../../types';
 import { formatCurrency, formatDate, getTodayDateStr, financialEngine } from '../../services/financialEngine';
+import { notificationService } from '../../services/notificationService';
 
 interface ModalBaixaParcelaProps {
   isOpen: boolean;
@@ -72,10 +73,28 @@ export const ModalBaixaParcela: React.FC<ModalBaixaParcelaProps> = ({
         observacoes,
       });
 
+      if (isParcial) {
+        notificationService.sucesso(
+          'Baixa Parcial Registrada!',
+          `R$ ${valorPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} liquidados de ${parcela.pessoaNome}. Gerada parcela complementar de R$ ${saldoRestante.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}.`,
+          { tab: 'financeiro', label: 'Ver no Financeiro' },
+          'baixa'
+        );
+      } else {
+        notificationService.sucesso(
+          'Baixa de Parcela Confirmada!',
+          `Liquidação de R$ ${valorPago.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} efetuada para ${parcela.pessoaNome} via ${formaPagamento.toUpperCase()}.`,
+          { tab: 'financeiro', label: 'Ver no Financeiro' },
+          'baixa'
+        );
+      }
+
       onSuccess();
       onClose();
     } catch (err: any) {
-      setErro(err.message || 'Erro ao processar baixa.');
+      const msg = err.message || 'Erro ao processar baixa.';
+      setErro(msg);
+      notificationService.erro('Falha na Liquidação', msg, undefined, 'baixa');
     } finally {
       setSalvando(false);
     }

@@ -131,17 +131,27 @@ export const financialEngine = {
 
     await storageService.saveParcela(parcelaAtualizada);
 
-    // Se a parcela estiver vinculada a uma mensalidade, marcar a mensalidade também
+    // Se a parcela estiver vinculada a uma mensalidade, marcar a mensalidade também com valor pago e saldo restante
+    const contaDaParcela = storageService.getContaById(parcela.conta_id);
     const mensalidades = storageService.getMensalidades();
     const mensVinculada = mensalidades.find(
-      (m) => m.conta_id === parcela.conta_id || (m.pessoa_id && m.data_vencimento === parcela.data_vencimento)
+      (m) =>
+        m.conta_id === parcela.conta_id ||
+        (contaDaParcela &&
+          m.pessoa_id === contaDaParcela.pessoa_id &&
+          (m.data_vencimento === parcela.data_vencimento || parcela.data_vencimento.startsWith(m.mes_referencia)))
     );
     if (mensVinculada) {
+      const valorMensalidade = Number(mensVinculada.valor) || 0;
+      const novoTotalPago = (Number(mensVinculada.valor_pago) || 0) + valorPago;
+      const saldoRestanteMens = Math.max(0, Math.round((valorMensalidade - novoTotalPago) * 100) / 100);
+      const novoStatus: Mensalidade['status'] = saldoRestanteMens <= 0.01 ? 'pago' : 'parcial';
+
       await storageService.saveMensalidade({
         ...mensVinculada,
-        status: saldoRestante <= 0.01 ? 'pago' : 'pendente',
-        valor_pago: (mensVinculada.valor_pago || 0) + valorPago,
-        data_pagamento: payload.dataPagamento,
+        status: novoStatus,
+        valor_pago: novoTotalPago,
+        data_pagamento: payload.dataPagamento || getTodayDateStr(),
       });
     }
 

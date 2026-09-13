@@ -20,6 +20,7 @@ import {
 import { WhatsAppTemplate } from '../../types';
 import { storageService } from '../../services/storage';
 import { financialEngine, getTodayDateStr } from '../../services/financialEngine';
+import { notificationService } from '../../services/notificationService';
 
 interface WhatsAppTemplatesViewProps {
   onTemplatesChange?: () => void;
@@ -72,6 +73,12 @@ export const WhatsAppTemplatesView: React.FC<WhatsAppTemplatesViewProps> = ({
     const novaLista = storageService.getWhatsAppTemplates();
     setTemplates(novaLista);
     setSalvoSucesso(true);
+    notificationService.sucesso(
+      'Modelo WhatsApp Salvo!',
+      `Template "${atualizado.titulo}" atualizado com sucesso.`,
+      { tab: 'cobrancas', label: 'Ver Cobranças' },
+      'cobranca'
+    );
     setTimeout(() => setSalvoSucesso(false), 2500);
 
     if (onTemplatesChange) {
@@ -95,6 +102,12 @@ export const WhatsAppTemplatesView: React.FC<WhatsAppTemplatesViewProps> = ({
     const novaLista = storageService.getWhatsAppTemplates();
     setTemplates(novaLista);
     handleSelecionarTemplate(novo);
+    notificationService.sucesso(
+      'Novo Modelo Criado!',
+      'Template personalizado pronto para uso e edição.',
+      { tab: 'cobrancas', label: 'Ver Cobranças' },
+      'cobranca'
+    );
   };
 
   // Excluir modelo customizado
@@ -107,6 +120,12 @@ export const WhatsAppTemplatesView: React.FC<WhatsAppTemplatesViewProps> = ({
       if (novaLista.length > 0) {
         handleSelecionarTemplate(novaLista[0]);
       }
+      notificationService.aviso(
+        'Modelo Excluído',
+        `O template "${templateAtual.titulo}" foi removido do sistema.`,
+        { tab: 'cobrancas', label: 'Ver Cobranças' },
+        'cobranca'
+      );
       if (onTemplatesChange) {
         onTemplatesChange();
       }
@@ -122,6 +141,12 @@ export const WhatsAppTemplatesView: React.FC<WhatsAppTemplatesViewProps> = ({
       if (novaLista.length > 0) {
         handleSelecionarTemplate(novaLista[0]);
       }
+      notificationService.info(
+        'Modelos Restaurados',
+        'Os templates oficiais de cobrança foram restaurados para o padrão.',
+        { tab: 'cobrancas', label: 'Ver Cobranças' },
+        'cobranca'
+      );
       if (onTemplatesChange) {
         onTemplatesChange();
       }

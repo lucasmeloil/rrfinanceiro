@@ -28,6 +28,7 @@ import { Pessoa, TipoPessoa } from '../../types';
 import { storageService } from '../../services/storage';
 import { formatCurrency } from '../../services/financialEngine';
 import { consultaApiService } from '../../services/consultaApi';
+import { notificationService } from '../../services/notificationService';
 
 interface PessoasViewProps {
   pessoas: Pessoa[];
@@ -344,6 +345,23 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
     };
 
     await storageService.savePessoa(novaPessoa);
+
+    if (pessoaEmEdicao) {
+      notificationService.sucesso(
+        'Cadastro Atualizado!',
+        `Os dados de "${novaPessoa.nome}" foram atualizados com sucesso.`,
+        { tab: 'pessoas', label: 'Ver Clientes' },
+        'cliente'
+      );
+    } else {
+      notificationService.sucesso(
+        'Cliente Cadastrado com Sucesso!',
+        `"${novaPessoa.nome}" (${novaPessoa.tipo.toUpperCase()}) foi inserido na base de dados.`,
+        { tab: 'pessoas', label: 'Ver Clientes' },
+        'cliente'
+      );
+    }
+
     setModalAberto(false);
     onRefresh();
   };
@@ -351,6 +369,12 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
   const handleExcluir = async (id: string, nome: string) => {
     if (window.confirm(`Tem certeza que deseja remover ${nome}?`)) {
       await storageService.deletePessoa(id);
+      notificationService.aviso(
+        'Cadastro Excluído',
+        `"${nome}" foi removido do sistema.`,
+        { tab: 'pessoas', label: 'Ver Clientes' },
+        'cliente'
+      );
       onRefresh();
     }
   };

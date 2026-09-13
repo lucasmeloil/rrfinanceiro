@@ -12,6 +12,9 @@ import { RelatoriosView } from './components/relatorios/RelatoriosView';
 import { BackupConfigView } from './components/backup/BackupConfigView';
 import { GestaoUsuariosView } from './components/auth/GestaoUsuariosView';
 import { ModalBaixaParcela } from './components/contas/ModalBaixaParcela';
+import { NotificationCenter } from './components/layout/NotificationCenter';
+import { ToastContainer } from './components/layout/ToastContainer';
+import { notificationService } from './services/notificationService';
 
 import { LoginView } from './components/auth/LoginView';
 import { SecurityAuditModal } from './components/auth/SecurityAuditModal';
@@ -52,6 +55,9 @@ export const App: React.FC = () => {
   const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaComPessoa | null>(null);
   const [modalBaixaAberto, setModalBaixaAberto] = useState(false);
 
+  // Central de Notificações
+  const [notificacoesOpen, setNotificacoesOpen] = useState(false);
+
   const isUpdatingHashRef = useRef(false);
 
   const handleToggleSidebarCollapse = () => {
@@ -78,7 +84,14 @@ export const App: React.FC = () => {
     setContas(storageService.getContas());
     setMensalidades(storageService.getMensalidades());
     setParcelasEnriquecidas(financialEngine.getParcelasEnriquecidas());
-    setResumo(financialEngine.calcularResumoDashboard());
+    const resumoCalculado = financialEngine.calcularResumoDashboard();
+    setResumo(resumoCalculado);
+    if (resumoCalculado) {
+      notificationService.verificarAlertasVencimento(
+        resumoCalculado.vencimentosHoje.length,
+        resumoCalculado.parcelasVencidas.length
+      );
+    }
     setConfig(storageService.getConfig());
 
     // Sincronização direta com o Supabase em segundo plano
@@ -89,7 +102,14 @@ export const App: React.FC = () => {
         setContas(dadosNuvem.contas);
         setMensalidades(dadosNuvem.mensalidades);
         setParcelasEnriquecidas(financialEngine.getParcelasEnriquecidas());
-        setResumo(financialEngine.calcularResumoDashboard());
+        const resumoNuvem = financialEngine.calcularResumoDashboard();
+        setResumo(resumoNuvem);
+        if (resumoNuvem) {
+          notificationService.verificarAlertasVencimento(
+            resumoNuvem.vencimentosHoje.length,
+            resumoNuvem.parcelasVencidas.length
+          );
+        }
       }
     } catch (err) {
       console.warn('Sincronização em segundo plano:', err);
@@ -221,6 +241,7 @@ export const App: React.FC = () => {
           onOpenGerarLote={() => setActiveTab('mensalidades')}
           onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
           onOpenSecurityModal={() => setSecurityModalOpen(true)}
+          onOpenNotificacoes={() => setNotificacoesOpen(true)}
           onLogout={handleLogout}
         />
 
@@ -264,6 +285,7 @@ export const App: React.FC = () => {
               mensalidades={mensalidades}
               pessoas={pessoas}
               onRefresh={carregarDados}
+              onDarBaixa={handleAbrirBaixa}
             />
           )}
 
@@ -316,6 +338,19 @@ export const App: React.FC = () => {
         isOpen={securityModalOpen}
         onClose={() => setSecurityModalOpen(false)}
       />
+
+      {/* Central de Notificações Popover / Modal */}
+      <NotificationCenter
+        isOpen={notificacoesOpen}
+        onClose={() => setNotificacoesOpen(false)}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setNotificacoesOpen(false);
+        }}
+      />
+
+      {/* Notificações Toasts Flutuantes em Tempo Real */}
+      <ToastContainer onNavigateTab={(tab) => setActiveTab(tab)} />
     </div>
   );
 };

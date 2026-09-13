@@ -99,6 +99,11 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   let qtdVencido = 0;
   let valorVencido = 0;
 
+  let qtdReceberPago = 0;
+  let qtdReceberTotal = 0;
+  let qtdPagarPago = 0;
+  let qtdPagarTotal = 0;
+
   const parcelasComplementares: ParcelaComPessoa[] = [];
   const formasPagamentoMap = new Map<string, { qtd: number; total: number }>();
   const clientesMap = new Map<string, {
@@ -124,10 +129,14 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     }
 
     if (item.tipoConta === 'receber') {
+      qtdReceberTotal++;
+      if (item.status === 'pago') qtdReceberPago++;
       totalReceberPrevisto += val;
       totalRecebido += pago;
       totalReceberPendente += saldo;
     } else {
+      qtdPagarTotal++;
+      if (item.status === 'pago') qtdPagarPago++;
       totalPagarPrevisto += val;
       totalPago += pago;
       totalPagarPendente += saldo;
@@ -284,7 +293,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     'Saldo a Receber Pendente:', '', totalReceberPendente,
     'Saldo a Pagar Pendente:', '', totalPagarPendente,
     'Saldo Projetado Final:', '', saldoProjetadoFinal,
-    'Taxa de Inadimplência:', '', `${taxaInadimplencia}%`,
+    'Títulos Vencidos em Aberto:', '', `${qtdVencido} títulos`,
   ]);
   r6.height = 25;
   wsResumo.mergeCells('A6:B6');
@@ -292,12 +301,12 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   wsResumo.mergeCells('G6:H6');
   wsResumo.mergeCells('J6:K6');
 
-  // Linha 7: Total Faturado e Margens
+  // Linha 7: Total Faturado e Saldo Operacional
   const r7 = wsResumo.addRow([
     'Faturamento Total Previsto:', '', totalReceberPrevisto,
     'Despesas Totais Previstas:', '', totalPagarPrevisto,
-    'Margem de Caixa Efetiva:', '', `${margemOperacional}%`,
-    'Títulos Vencidos em Aberto:', '', `${qtdVencido} títulos`,
+    'Saldo Operacional Líquido:', '', saldoEmCaixa,
+    'Situação de Cobrança:', '', valorVencido === 0 ? 'Títulos em Dia' : `${qtdVencido} em atraso`,
   ]);
   r7.height = 25;
   wsResumo.mergeCells('A7:B7');
@@ -305,12 +314,12 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   wsResumo.mergeCells('G7:H7');
   wsResumo.mergeCells('J7:K7');
 
-  // Linha 8: Eficiência e Status da Saúde
+  // Linha 8: Eficiência Operacional e Status da Saúde
   const r8 = wsResumo.addRow([
-    'Taxa de Liquidação Receita:', '', `${taxaRecebimento}%`,
-    'Taxa de Execução Despesa:', '', `${taxaExecucaoDespesas}%`,
+    'Títulos Recebidos / Quitados:', '', `${qtdReceberPago} de ${qtdReceberTotal} títulos`,
+    'Títulos Pagos / Despesas:', '', `${qtdPagarPago} de ${qtdPagarTotal} despesas`,
     'Saúde Financeira do Período:', '', saldoEmCaixa >= 0 ? '🟢 SUPERÁVIT POSITIVO' : '🔴 DÉFICIT EM CAIXA',
-    'Classificação de Risco:', '', valorVencido === 0 ? '🟢 BAIXO / CONTROLADO' : '🔴 ATENÇÃO REQUERIDA',
+    'Classificação Operacional:', '', valorVencido === 0 ? '🟢 BAIXO / CONTROLADO' : '🔴 ATENÇÃO REQUERIDA',
   ]);
   r8.height = 25;
   wsResumo.mergeCells('A8:B8');
@@ -400,8 +409,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     'Valor Total Previsto (R$)',
     'Valor Efetivamente Pago (R$)',
     'Saldo Aberto Pendente (R$)',
-    'Participação Faturamento (%)',
-    'Taxa de Liquidação (%)',
+    'Saldo Restante a Receber (R$)',
+    'Situação Operacional',
     'Prazo Médio Recebimento',
     'Impacto no Fluxo de Caixa',
     'Procedimento Operacional Recomendado',
@@ -420,7 +429,6 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     };
   });
 
-  const totalGeralOperacao = totalReceberPrevisto || 1;
   const statusLinhas = [
     {
       status: '🟢  QUITADO / PAGO',
@@ -429,8 +437,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       previsto: totalRecebido,
       pago: totalRecebido,
       saldo: 0,
-      part: `${Math.round((totalRecebido / totalGeralOperacao) * 100)}%`,
-      liq: '100%',
+      saldoRestante: 0,
+      situacao: 'Totalmente Quitado',
       prazo: 'Imediato / Liquidado',
       impacto: 'ENTRADA EFETIVADA',
       procedimento: 'Recebimento baixado e conferido no extrato',
@@ -445,8 +453,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       previsto: Math.max(0, totalReceberPendente - valorVencido),
       pago: 0,
       saldo: Math.max(0, totalReceberPendente - valorVencido),
-      part: `${Math.round((Math.max(0, totalReceberPendente - valorVencido) / totalGeralOperacao) * 100)}%`,
-      liq: '0%',
+      saldoRestante: Math.max(0, totalReceberPendente - valorVencido),
+      situacao: 'Aguardando Vencimento',
       prazo: 'A vencer no prazo hábil',
       impacto: 'PROJEÇÃO DE ENTRADA',
       procedimento: 'Enviar lembrete amigável antes do vencimento',
@@ -461,8 +469,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       previsto: valorVencido,
       pago: 0,
       saldo: valorVencido,
-      part: `${Math.round((valorVencido / totalGeralOperacao) * 100)}%`,
-      liq: '0%',
+      saldoRestante: valorVencido,
+      situacao: 'Cobrança Ativa Requerida',
       prazo: 'Vencido (Inadimplente)',
       impacto: 'RETENÇÃO TEMPORÁRIA',
       procedimento: 'Acionar cliente via WhatsApp e registrar acordo',
@@ -480,8 +488,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       st.previsto,
       st.pago,
       st.saldo,
-      st.part,
-      st.liq,
+      st.saldoRestante,
+      st.situacao,
       st.prazo,
       st.impacto,
       st.procedimento,
@@ -500,19 +508,16 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: st.bg } };
         cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: st.fg } };
         cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-      } else if (colNum === 2 || colNum === 9 || colNum === 10 || colNum === 12) {
+      } else if (colNum === 2 || colNum === 8 || colNum === 9 || colNum === 10 || colNum === 12) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.font = { name: 'Arial', size: 9.5 };
       } else if (colNum === 3) {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.font = { name: 'Arial', size: 9.5, bold: true };
-      } else if (colNum === 4 || colNum === 5 || colNum === 6) {
+      } else if (colNum === 4 || colNum === 5 || colNum === 6 || colNum === 7) {
         cell.numFmt = '"R$ " #,##0.00';
         cell.alignment = { vertical: 'middle', horizontal: 'right' };
         cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: st.fg } };
-      } else if (colNum === 7 || colNum === 8) {
-        cell.alignment = { vertical: 'middle', horizontal: 'center' };
-        cell.font = { name: 'Arial', size: 9.5, bold: true };
       } else if (colNum === 11) {
         cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
         cell.font = { name: 'Arial', size: 9, italic: true };
@@ -528,8 +533,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     totalReceberPrevisto,
     totalRecebido,
     totalReceberPendente,
-    '100%',
-    `${taxaRecebimento}%`,
+    totalReceberPendente,
+    'Movimentação Geral',
     'Ciclo do Período',
     saldoEmCaixa >= 0 ? 'RESULTADO POSITIVO' : 'RESULTADO NEGATIVO',
     'Gestão e controle financeiro integrados',
@@ -545,7 +550,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     };
     if (colNum === 1 || colNum === 2) {
       cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-    } else if (colNum === 4 || colNum === 5 || colNum === 6) {
+    } else if (colNum === 4 || colNum === 5 || colNum === 6 || colNum === 7) {
       cell.numFmt = '"R$ " #,##0.00';
       cell.alignment = { vertical: 'middle', horizontal: 'right' };
     } else {
@@ -575,11 +580,11 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     'Qtd. Transações Realizadas',
     'Valor Total Liquidado (R$)',
     'Ticket Médio por Transação (R$)',
-    'Participação no Recebido (%)',
+    'Destinação do Recurso',
     'Prazo Médio Compensação',
     'Disponibilidade no Caixa',
     'Canal / Meio de Recebimento',
-    'Custo Operacional Estimado',
+    'Conferência da Tesouraria',
     'Status de Conciliação Bancária',
     'Observações da Tesouraria',
   ]);
@@ -606,7 +611,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   if (formasPagamentoMap.size === 0) {
     const rowVazia = wsResumo.addRow([
       'Nenhum pagamento liquidado no período',
-      '-', 0, 0, 0, '0%', '-', '-', '-', '-', 'Aguardando Baixas', 'Nenhuma baixa registrada',
+      '-', 0, 0, 0, 'Caixa Operacional', '-', '-', '-', 'Conferido', 'Aguardando Baixas', 'Nenhuma baixa registrada',
     ]);
     rowVazia.height = 24;
     rowVazia.eachCell((c) => {
@@ -615,20 +620,19 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     });
   } else {
     // Especificações por forma de pagamento
-    const especificacoesFormas: Record<string, { modalidade: string; prazo: string; disp: string; canal: string; custo: string }> = {
-      pix: { modalidade: 'Transferência Instantânea', prazo: 'D+0 (Instantâneo)', disp: 'Disponível Imediato', canal: 'Chave PIX / QR Code', custo: 'Sem tarifa' },
-      dinheiro: { modalidade: 'Espécie em Moeda Corrente', prazo: 'D+0 (Imediato)', disp: 'Caixa Físico', canal: 'Balcão / Caixa', custo: 'Sem tarifa' },
-      cartao_debito: { modalidade: 'Débito Eletrônico à Vista', prazo: 'D+1 dia útil', disp: 'Crédito em Conta', canal: 'Maquininha POS / TEF', custo: 'Tarifa débito' },
-      cartao_credito: { modalidade: 'Crédito à Vista / Parcelado', prazo: 'D+30 dias / Antecipado', disp: 'Adquirente / Cartão', canal: 'Maquininha / Link de Pagamento', custo: 'Tarifa crédito' },
-      boleto: { modalidade: 'Boleto de Cobrança Bancária', prazo: 'D+1 a D+2 dias úteis', disp: 'Liquidação Bancária', canal: 'Compensação Bancária', custo: 'Tarifa boleto' },
-      transferencia: { modalidade: 'Transferência TED / DOC', prazo: 'D+0 ou D+1 dia útil', disp: 'Crédito em Conta', canal: 'Internet Banking', custo: 'Conforme banco' },
-      outro: { modalidade: 'Outro Meio de Liquidação', prazo: 'Variável', disp: 'Conforme acordo', canal: 'Operação Direta', custo: 'A combinar' },
+    const especificacoesFormas: Record<string, { modalidade: string; prazo: string; disp: string; canal: string; conf: string }> = {
+      pix: { modalidade: 'Transferência Instantânea', prazo: 'D+0 (Instantâneo)', disp: 'Disponível Imediato', canal: 'Chave PIX / QR Code', conf: 'Identificado no Extrato' },
+      dinheiro: { modalidade: 'Espécie em Moeda Corrente', prazo: 'D+0 (Imediato)', disp: 'Caixa Físico', canal: 'Balcão / Caixa', conf: 'Conferido em Caixa' },
+      cartao_debito: { modalidade: 'Débito Eletrônico à Vista', prazo: 'D+1 dia útil', disp: 'Crédito em Conta', canal: 'Maquininha POS / TEF', conf: 'Lote Processado' },
+      cartao_credito: { modalidade: 'Crédito à Vista / Parcelado', prazo: 'D+30 dias / Antecipado', disp: 'Adquirente / Cartão', canal: 'Maquininha / Link de Pagamento', conf: 'Lote Processado' },
+      boleto: { modalidade: 'Boleto de Cobrança Bancária', prazo: 'D+1 a D+2 dias úteis', disp: 'Liquidação Bancária', canal: 'Compensação Bancária', conf: 'Retorno Bancário' },
+      transferencia: { modalidade: 'Transferência TED / DOC', prazo: 'D+0 ou D+1 dia útil', disp: 'Crédito em Conta', canal: 'Internet Banking', conf: 'Identificado no Extrato' },
+      outro: { modalidade: 'Outro Meio de Liquidação', prazo: 'Variável', disp: 'Conforme acordo', canal: 'Operação Direta', conf: 'Conferido' },
     };
 
     Array.from(formasPagamentoMap.entries())
       .sort((a, b) => b[1].total - a[1].total)
       .forEach(([formaKey, valData]) => {
-        const pct = totalFormasValor > 0 ? `${Math.round((valData.total / totalFormasValor) * 100)}%` : '0%';
         const ticketMedio = valData.qtd > 0 ? valData.total / valData.qtd : 0;
         const nomeForma = formatFormaPagamento(formaKey as FormaPagamento);
         const espec = especificacoesFormas[formaKey] || especificacoesFormas.outro;
@@ -639,11 +643,11 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
           valData.qtd,
           valData.total,
           ticketMedio,
-          pct,
+          'Caixa Disponível',
           espec.prazo,
           espec.disp,
           espec.canal,
-          espec.custo,
+          espec.conf,
           '100% Conciliado',
           'Entrada confirmada na tesouraria',
         ]);
@@ -661,10 +665,10 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
             cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: PALETTE.purpleText } };
             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALETTE.purpleSoft } };
             cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
-          } else if (colNum === 2 || colNum === 7 || colNum === 8 || colNum === 9 || colNum === 10 || colNum === 11) {
+          } else if (colNum === 2 || colNum === 6 || colNum === 7 || colNum === 8 || colNum === 9 || colNum === 10 || colNum === 11) {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
             cell.font = { name: 'Arial', size: 9 };
-          } else if (colNum === 3 || colNum === 6) {
+          } else if (colNum === 3) {
             cell.alignment = { vertical: 'middle', horizontal: 'center' };
             cell.font = { name: 'Arial', size: 9.5, bold: true };
           } else if (colNum === 4 || colNum === 5) {
@@ -686,7 +690,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     totalFormasQtd,
     totalFormasValor,
     totalFormasQtd > 0 ? totalFormasValor / totalFormasQtd : 0,
-    '100%',
+    'Caixa Consolidado',
     'Fluxo Direto de Caixa',
     'Totalmente Disponível',
     'Canais Integrados',
@@ -743,7 +747,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       'Valor Já Liquidado (R$)',
       'Saldo em Aberto (R$)',
       'Forma Preferencial',
-      'Percentual Liquidado (%)',
+      'Situação da Quitação',
       'Status Geral do Cliente',
       'Ação e Relacionamento Recomendado',
     ]);
@@ -775,7 +779,12 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
         acaoCli = 'Acompanhar vencimento e enviar lembrete';
       }
 
-      const pctLiq = cli.totalPrevisto > 0 ? `${Math.round((cli.totalPago / cli.totalPrevisto) * 100)}%` : '100%';
+      const situacaoQuitacao =
+        cli.totalSaldo <= 0
+          ? 'Totalmente Quitado'
+          : cli.totalPago > 0
+          ? `Restante: R$ ${cli.totalSaldo.toFixed(2)}`
+          : 'Totalmente Pendente';
 
       const rowRank = wsResumo.addRow([
         `#0${idx + 1} Lugar`,
@@ -787,7 +796,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
         cli.totalPago,
         cli.totalSaldo,
         cli.formaPreferencial,
-        pctLiq,
+        situacaoQuitacao,
         statusCli,
         acaoCli,
       ]);

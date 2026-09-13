@@ -16,6 +16,7 @@ import {
 import { ConfiguracoesApp } from '../../types';
 import { storageService } from '../../services/storage';
 import { checkSupabaseConnection, SupabaseSyncStatus } from '../../services/supabaseClient';
+import { notificationService } from '../../services/notificationService';
 
 interface BackupConfigViewProps {
   onRefresh: () => void;
@@ -46,6 +47,12 @@ export const BackupConfigView: React.FC<BackupConfigViewProps> = ({ onRefresh, o
     e.preventDefault();
     storageService.saveConfig(config);
     setMsgSucesso('Configurações salvas com sucesso!');
+    notificationService.sucesso(
+      'Configurações Salvas!',
+      'As configurações e chaves da empresa foram atualizadas.',
+      undefined,
+      'sistema'
+    );
     setTimeout(() => setMsgSucesso(''), 3000);
     onRefresh();
   };
@@ -63,6 +70,12 @@ export const BackupConfigView: React.FC<BackupConfigViewProps> = ({ onRefresh, o
     URL.revokeObjectURL(url);
 
     setMsgSucesso('Arquivo de backup exportado com sucesso!');
+    notificationService.sucesso(
+      'Backup Exportado com Êxito!',
+      'Arquivo JSON com todas as tabelas e dados foi baixado.',
+      undefined,
+      'sistema'
+    );
     setTimeout(() => setMsgSucesso(''), 3000);
   };
 
@@ -78,13 +91,21 @@ export const BackupConfigView: React.FC<BackupConfigViewProps> = ({ onRefresh, o
         if (sucesso) {
           setConfig(storageService.getConfig());
           setMsgSucesso('Backup importado e restaurado com êxito!');
+          notificationService.sucesso(
+            'Backup Restaurado!',
+            'Dados do sistema foram importados com sucesso.',
+            { tab: 'dashboard', label: 'Ver Dashboard' },
+            'sistema'
+          );
           setTimeout(() => setMsgSucesso(''), 4000);
           onRefresh();
         } else {
           setMsgErro('Formato do arquivo de backup inválido.');
+          notificationService.erro('Erro ao Restaurar Backup', 'Formato do arquivo JSON inválido.', undefined, 'sistema');
         }
       } catch {
         setMsgErro('Erro ao processar o arquivo selecionado.');
+        notificationService.erro('Erro no Arquivo', 'Falha ao processar o arquivo selecionado.', undefined, 'sistema');
       }
     };
     reader.readAsText(file);

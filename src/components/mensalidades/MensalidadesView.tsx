@@ -22,6 +22,7 @@ import {
   formatDate,
   getTodayDateStr,
 } from '../../services/financialEngine';
+import { notificationService } from '../../services/notificationService';
 
 interface MensalidadesViewProps {
   mensalidades: Mensalidade[];
@@ -34,6 +35,7 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
   mensalidades,
   pessoas,
   onRefresh,
+  onDarBaixa,
 }) => {
   const [busca, setBusca] = useState('');
   const [filtroMes, setFiltroMes] = useState<string>(getTodayDateStr().substring(0, 7)); // 'YYYY-MM'
@@ -42,6 +44,32 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
   // Modal Lote
   const [modalLoteAberto, setModalLoteAberto] = useState(false);
   const [loteMesReferencia, setLoteMesReferencia] = useState(getTodayDateStr().substring(0, 7));
+
+  const handleDarBaixaMensalidade = (m: Mensalidade) => {
+    if (!onDarBaixa) return;
+    const parcelas = storageService.getParcelas();
+    let par = parcelas.find((p) => p.conta_id === m.conta_id && p.status !== 'pago');
+    if (!par) {
+      par = parcelas.find((p) => p.conta_id === m.conta_id);
+    }
+    const cliente = pessoas.find((p) => p.id === m.pessoa_id);
+    const valTotal = Number(m.valor) || 0;
+    const valPago = Number(m.valor_pago) || 0;
+    const saldoRestante = Math.max(0, Math.round((valTotal - valPago) * 100) / 100);
+
+    if (par) {
+      const parEnriquecida: ParcelaComPessoa = {
+        ...par,
+        valor: saldoRestante > 0 ? saldoRestante : par.valor,
+        pessoaNome: cliente?.nome || 'Cliente',
+        pessoaTelefone: cliente?.telefone || '',
+        pessoaEmail: cliente?.email || '',
+        tipoConta: 'receber',
+        descricaoConta: `Mensalidade ${m.mes_referencia} - ${cliente?.nome || ''}`,
+      };
+      onDarBaixa(parEnriquecida);
+    }
+  };
   const [lotePeriodicidade, setLotePeriodicidade] = useState<'mensal' | 'trimestral' | 'semestral' | 'anual'>('mensal');
   const [resultadoLote, setResultadoLote] = useState<{
     geradas: number;
@@ -90,6 +118,13 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
       jaExistiam: res.ignoradasJaExistentes,
       semConfig: res.clientesSemConfiguracao,
     });
+
+    notificationService.sucesso(
+      'Geração de Mensalidades em Lote Concluída!',
+      `${res.geradas.length} mensalidades geradas para o mês ${loteMesReferencia}. (${res.ignoradasJaExistentes} já existiam).`,
+      { tab: 'mensalidades', label: 'Ver Mensalidades' },
+      'financeiro'
+    );
 
     onRefresh();
   };
@@ -142,6 +177,13 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
       created_at: new Date().toISOString(),
     });
 
+    notificationService.sucesso(
+      'Mensalidade Avulsa Criada!',
+      `Mensalidade de R$ ${manualValor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} gerada para ${cliente?.nome || 'Cliente'}.`,
+      { tab: 'mensalidades', label: 'Ver Mensalidades' },
+      'financeiro'
+    );
+
     setModalManualAberto(false);
     onRefresh();
   };
@@ -149,6 +191,12 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
   const handleExcluirMensalidade = (id: string) => {
     if (window.confirm('Deseja excluir esta mensalidade do histórico?')) {
       storageService.deleteMensalidade(id);
+      notificationService.aviso(
+        'Mensalidade Excluída',
+        'A cobrança de mensalidade foi removida do sistema.',
+        { tab: 'mensalidades', label: 'Ver Mensalidades' },
+        'financeiro'
+      );
       onRefresh();
     }
   };
@@ -165,9 +213,11 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
   });
 
   const totalValorMes = mensalidadesFiltradas.reduce((acc, m) => acc + (Number(m.valor) || 0), 0);
-  const totalPagoMes = mensalidadesFiltradas
-    .filter((m) => m.status === 'pago')
-    .reduce((acc, m) => acc + (Number(m.valor) || 0), 0);
+  const totalPagoMes = mensalidadesFiltradas.reduce(
+    (acc, m) => acc + (Number(m.valor_pago) || (m.status === 'pago' ? Number(m.valor) : 0)),
+    0
+  );
+  const totalSaldoRestante = Math.max(0, Math.round((totalValorMes - totalPagoMes) * 100) / 100);
 
   return (
     <div className="page-wrapper">
@@ -198,6 +248,19 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                 ? `${Math.round((totalPagoMes / totalValorMes) * 100)}% de realização`
                 : 'Sem faturamento'}
             </span>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon-wrapper" style={{ backgroundColor: totalSaldoRestante > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)', color: totalSaldoRestante > 0 ? '#dc2626' : '#10b981' }}>
+            <Clock size={22} />
+          </div>
+          <div className="kpi-label">Saldo Restante a Receber</div>
+          <div className="kpi-value" style={{ color: totalSaldoRestante > 0 ? '#dc2626' : '#10b981' }}>
+            {formatCurrency(totalSaldoRestante)}
+          </div>
+          <div className="kpi-subtext" style={{ color: 'var(--text-secondary)' }}>
+            <span>{totalSaldoRestante > 0 ? 'Pendente de liquidação' : '100% quitado'}</span>
           </div>
         </div>
 
@@ -265,6 +328,7 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
             >
               <option value="todos">Todos Status</option>
               <option value="pendente">Pendentes</option>
+              <option value="parcial">Parcial</option>
               <option value="pago">Pagas</option>
               <option value="vencido">Vencidas</option>
             </select>
@@ -302,16 +366,18 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
           </div>
         ) : (
           <>
-            {/* 1. VISUALIZAÇÃO DESKTOP: Tabela Tradicional */}
+            {/* 1. VISUALIZAÇÃO DESKTOP: Tabela Tradicional com Saldo Restante */}
             <div className="table-container desktop-only">
-              <table className="custom-table data-table" style={{ width: '100%', minWidth: '880px', borderCollapse: 'collapse' }}>
+              <table className="custom-table data-table" style={{ width: '100%', minWidth: '940px', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Competência</th>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Cliente</th>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Emissão</th>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Vencimento</th>
-                    <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Valor</th>
+                    <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', textAlign: 'right' }}>Valor Total</th>
+                    <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', textAlign: 'right' }}>Valor Pago</th>
+                    <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', textAlign: 'right' }}>Saldo Restante</th>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Status</th>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase' }}>Data Pagto</th>
                     <th style={{ padding: '0.8rem 1rem', fontSize: '0.75rem', fontWeight: 700, color: '#475569', textTransform: 'uppercase', textAlign: 'right' }}>Ações</th>
@@ -320,6 +386,14 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                 <tbody>
                   {mensalidadesFiltradas.map((m) => {
                     const cliente = pessoas.find((p) => p.id === m.pessoa_id);
+                    const valTotal = Number(m.valor) || 0;
+                    const valPago = Number(m.valor_pago) || (m.status === 'pago' ? valTotal : 0);
+                    const saldoRestante = Math.max(0, Math.round((valTotal - valPago) * 100) / 100);
+                    const isParcial = (valPago > 0 && saldoRestante > 0.01) || m.status === 'parcial';
+                    const isPaga = m.status === 'pago' || saldoRestante <= 0.01;
+                    const hoje = getTodayDateStr();
+                    const isVencida = !isPaga && m.data_vencimento < hoje;
+
                     return (
                       <tr key={m.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
                         <td style={{ padding: '0.85rem 1rem' }}>
@@ -335,27 +409,54 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                         </td>
                         <td style={{ padding: '0.85rem 1rem' }}>{formatDate(m.data_emissao)}</td>
                         <td style={{ padding: '0.85rem 1rem' }}>{formatDate(m.data_vencimento)}</td>
-                        <td style={{ padding: '0.85rem 1rem', fontWeight: 800, color: '#16a34a' }}>{formatCurrency(m.valor)}</td>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: '#0f172a', textAlign: 'right' }}>
+                          {formatCurrency(valTotal)}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: 700, color: valPago > 0 ? '#16a34a' : '#94a3b8', textAlign: 'right' }}>
+                          {valPago > 0 ? formatCurrency(valPago) : '-'}
+                        </td>
+                        <td style={{ padding: '0.85rem 1rem', fontWeight: 800, textAlign: 'right', color: isParcial ? '#d97706' : (saldoRestante > 0 ? '#dc2626' : '#16a34a') }}>
+                          {formatCurrency(saldoRestante)}
+                        </td>
                         <td style={{ padding: '0.85rem 1rem' }}>
                           <span
                             className={`status-badge ${
-                              m.status === 'pago'
+                              isPaga
                                 ? 'status-pago'
-                                : m.status === 'vencido'
+                                : isParcial
+                                ? 'status-parcial'
+                                : isVencida
                                 ? 'status-vencido'
                                 : 'status-pendente'
                             }`}
                           >
-                            {m.status.toUpperCase()}
+                            {isPaga
+                              ? 'PAGO'
+                              : isParcial
+                              ? `PARCIAL (${formatCurrency(saldoRestante)} rest.)`
+                              : isVencida
+                              ? 'VENCIDO'
+                              : 'PENDENTE'}
                           </span>
                         </td>
                         <td style={{ padding: '0.85rem 1rem' }}>{m.data_pagamento ? formatDate(m.data_pagamento) : '-'}</td>
                         <td style={{ padding: '0.85rem 1rem', textAlign: 'right' }}>
-                          <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+                          <div style={{ display: 'inline-flex', gap: '0.4rem', alignItems: 'center' }}>
+                            {saldoRestante > 0.01 && onDarBaixa && (
+                              <button
+                                className="btn-icon"
+                                onClick={() => handleDarBaixaMensalidade(m)}
+                                title={`Dar Baixa / Receber saldo de ${formatCurrency(saldoRestante)}`}
+                                style={{ color: '#16a34a', backgroundColor: '#dcfce7', borderColor: '#bbf7d0' }}
+                              >
+                                <CheckCircle2 size={16} />
+                              </button>
+                            )}
+
                             <button
                               className="btn-icon"
                               onClick={() => handleExcluirMensalidade(m.id)}
-                              title="Remover"
+                              title="Remover Mensalidade"
                               style={{ color: '#dc2626', backgroundColor: '#fff1f2', borderColor: '#fecaca' }}
                             >
                               <Trash2 size={15} />
@@ -369,11 +470,17 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
               </table>
             </div>
 
-            {/* 2. VISUALIZAÇÃO MOBILE NATIVA: Cards Fluidos sem estouro */}
+            {/* 2. VISUALIZAÇÃO MOBILE NATIVA: Cards Fluidos com Saldo Restante */}
             <div className="mobile-only" style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', padding: '0.75rem' }}>
               {mensalidadesFiltradas.map((m) => {
                 const cliente = pessoas.find((p) => p.id === m.pessoa_id);
-                const isPaga = m.status === 'pago';
+                const valTotal = Number(m.valor) || 0;
+                const valPago = Number(m.valor_pago) || (m.status === 'pago' ? valTotal : 0);
+                const saldoRestante = Math.max(0, Math.round((valTotal - valPago) * 100) / 100);
+                const isParcial = (valPago > 0 && saldoRestante > 0.01) || m.status === 'parcial';
+                const isPaga = m.status === 'pago' || saldoRestante <= 0.01;
+                const hoje = getTodayDateStr();
+                const isVencida = !isPaga && m.data_vencimento < hoje;
 
                 return (
                   <div
@@ -402,29 +509,42 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                         className={`status-badge ${
                           isPaga
                             ? 'status-pago'
-                            : m.status === 'vencido'
+                            : isParcial
+                            ? 'status-parcial'
+                            : isVencida
                             ? 'status-vencido'
                             : 'status-pendente'
                         }`}
                       >
-                        {m.status.toUpperCase()}
+                        {isPaga
+                          ? 'PAGO'
+                          : isParcial
+                          ? 'PARCIAL'
+                          : isVencida
+                          ? 'VENCIDO'
+                          : 'PENDENTE'}
                       </span>
                     </div>
 
-                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', backgroundColor: '#f8fafc', padding: '0.55rem 0.75rem', borderRadius: '8px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', color: '#64748b' }}>
+                      <span>Vencimento: <strong style={{ color: isVencida ? '#dc2626' : '#334155' }}>{formatDate(m.data_vencimento)}</strong></span>
+                      <span>Emissão: {formatDate(m.data_emissao)}</span>
+                    </div>
+
+                    {/* Grid de Valores com Saldo Restante */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.35rem', backgroundColor: '#f8fafc', padding: '0.55rem 0.5rem', borderRadius: '8px', textAlign: 'center' }}>
                       <div>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Vencimento</div>
-                        <div style={{ fontSize: '0.84rem', fontWeight: 600, color: '#334155' }}>
-                          {formatDate(m.data_vencimento)}
-                        </div>
-                        <div style={{ fontSize: '0.68rem', color: '#94a3b8' }}>
-                          Emissão: {formatDate(m.data_emissao)}
-                        </div>
+                        <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Total</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: '#0f172a' }}>{formatCurrency(valTotal)}</div>
                       </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '0.7rem', color: '#64748b' }}>Valor</div>
-                        <div style={{ fontWeight: 800, fontSize: '1.15rem', color: '#16a34a' }}>
-                          {formatCurrency(m.valor)}
+                      <div>
+                        <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Recebido</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.85rem', color: valPago > 0 ? '#16a34a' : '#94a3b8' }}>{valPago > 0 ? formatCurrency(valPago) : '-'}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.65rem', color: '#64748b', textTransform: 'uppercase' }}>Saldo Restante</div>
+                        <div style={{ fontWeight: 800, fontSize: '0.88rem', color: isParcial ? '#d97706' : (saldoRestante > 0 ? '#dc2626' : '#16a34a') }}>
+                          {formatCurrency(saldoRestante)}
                         </div>
                       </div>
                     </div>
@@ -437,14 +557,42 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                     )}
 
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.2rem' }}>
+                      {saldoRestante > 0.01 && onDarBaixa && (
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => handleDarBaixaMensalidade(m)}
+                          style={{
+                            flex: 2,
+                            minHeight: '42px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem',
+                            backgroundColor: '#16a34a',
+                            borderColor: '#15803d',
+                          }}
+                        >
+                          <CheckCircle2 size={16} />
+                          <span>Dar Baixa ({formatCurrency(saldoRestante)})</span>
+                        </button>
+                      )}
+
                       <button
                         className="btn btn-secondary"
                         onClick={() => handleExcluirMensalidade(m.id)}
                         title="Remover Mensalidade"
-                        style={{ color: '#dc2626', width: '100%', minHeight: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
+                        style={{
+                          flex: 1,
+                          color: '#dc2626',
+                          minHeight: '42px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.4rem',
+                        }}
                       >
-                        <Trash2 size={16} />
-                        <span>Remover Mensalidade</span>
+                        <Trash2 size={15} />
+                        <span>Excluir</span>
                       </button>
                     </div>
                   </div>

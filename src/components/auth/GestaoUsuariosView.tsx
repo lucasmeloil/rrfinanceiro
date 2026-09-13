@@ -20,6 +20,7 @@ import {
   Key,
 } from 'lucide-react';
 import { authService, UsuarioSistemaPublico } from '../../services/authService';
+import { notificationService } from '../../services/notificationService';
 
 export const GestaoUsuariosView: React.FC = () => {
   const [usuarios, setUsuarios] = useState<UsuarioSistemaPublico[]>([]);
@@ -84,6 +85,12 @@ export const GestaoUsuariosView: React.FC = () => {
       const res = await authService.registrarUsuario(novoNome, novoEmail, novaSenha, novoRole);
       if (res.sucesso) {
         setMsgSucesso(res.mensagem || `Usuário "${novoNome}" cadastrado com sucesso!`);
+        notificationService.sucesso(
+          'Novo Acesso Cadastrado!',
+          `Usuário "${novoNome}" (${novoEmail}) cadastrado com perfil ${novoRole.toUpperCase()}.`,
+          { tab: 'usuarios', label: 'Ver Usuários' },
+          'seguranca'
+        );
         await carregarDados();
         setModalNovoAberto(false);
         setNovoNome('');
@@ -126,6 +133,12 @@ export const GestaoUsuariosView: React.FC = () => {
       const res = await authService.alterarSenhaUsuario(usuarioAlvoSenha.email, senhaNovaDefinida);
       if (res.sucesso) {
         setMsgSucesso(res.mensagem || `Senha de ${usuarioAlvoSenha.nome} alterada com sucesso!`);
+        notificationService.sucesso(
+          'Senha Redefinida com Sucesso!',
+          `A senha de "${usuarioAlvoSenha.nome}" (${usuarioAlvoSenha.email}) foi alterada e protegida com SHA-256.`,
+          { tab: 'usuarios', label: 'Ver Usuários' },
+          'seguranca'
+        );
         setModalSenhaAberto(false);
         setSenhaNovaDefinida('');
         setUsuarioAlvoSenha(null);
@@ -155,6 +168,12 @@ export const GestaoUsuariosView: React.FC = () => {
       const ok = await authService.removerUsuarioSistema(user.email);
       if (ok) {
         setMsgSucesso(`Acesso de ${user.email} revogado com êxito!`);
+        notificationService.aviso(
+          'Acesso Revogado',
+          `As credenciais de "${user.nome}" (${user.email}) foram revogadas e removidas do sistema.`,
+          { tab: 'usuarios', label: 'Ver Usuários' },
+          'seguranca'
+        );
         await carregarDados();
         setTimeout(() => setMsgSucesso(''), 4000);
       } else {

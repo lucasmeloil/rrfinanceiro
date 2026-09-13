@@ -84,7 +84,7 @@ export interface Mensalidade {
   valor: number;
   valor_pago?: number;
   data_pagamento?: string;
-  status: 'pendente' | 'pago' | 'vencido';
+  status: 'pendente' | 'pago' | 'vencido' | 'parcial';
   conta_id?: string;
   observacoes?: string;
   created_at: string;
@@ -157,4 +157,25 @@ export interface WhatsAppTemplate {
   isSystem?: boolean;
   created_at?: string;
   updated_at?: string;
+}
+
+export type TipoNotificacao = 'sucesso' | 'info' | 'aviso' | 'erro';
+export type CategoriaNotificacao = 'financeiro' | 'baixa' | 'cobranca' | 'cliente' | 'sistema' | 'seguranca';
+
+export interface NotificacaoSistema {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  tipo: TipoNotificacao;
+  categoria: CategoriaNotificacao;
+  lida: boolean;
+  dataHora: string;
+  linkAcao?: {
+    tab: 'dashboard' | 'pessoas' | 'receber' | 'pagar' | 'mensalidades' | 'cobrancas' | 'financeiro' | 'relatorios' | 'config' | 'usuarios';
+    label: string;
+  };
+}
+
+export interface ToastNotificacao extends NotificacaoSistema {
+  duracao?: number;
 }

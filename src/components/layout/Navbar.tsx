@@ -1,10 +1,12 @@
-import React from 'react';
-import { Menu, Calendar } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Menu, Calendar, Bell } from 'lucide-react';
 import { ActiveTab } from './Sidebar';
+import { notificationService } from '../../services/notificationService';
 
 interface NavbarProps {
   activeTab: ActiveTab;
   onToggleMobileMenu: () => void;
+  onOpenNotificacoes?: () => void;
   userEmail?: string;
   onLogout?: () => void;
   // Propriedades opcionais legadas para compatibilidade
@@ -18,9 +20,18 @@ interface NavbarProps {
 export const Navbar: React.FC<NavbarProps> = ({
   activeTab,
   onToggleMobileMenu,
+  onOpenNotificacoes,
   userEmail,
   onLogout,
 }) => {
+  const [unreadCount, setUnreadCount] = useState<number>(() => notificationService.obterContadorNaoLidas());
+
+  useEffect(() => {
+    const unsub = notificationService.inscreverNotificacoes((notifs) => {
+      setUnreadCount(notifs.filter((n) => !n.lida).length);
+    });
+    return () => unsub();
+  }, []);
   const getTabInfo = () => {
     switch (activeTab) {
       case 'dashboard':
@@ -67,9 +78,26 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </div>
 
-      {/* Lado Direito da Navbar: Limpo e Executivo */}
-      <div className="header-actions desktop-only">
+      {/* Lado Direito da Navbar: Sino de Notificações e Data */}
+      <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        {/* Botão Sino de Notificações */}
+        <button
+          className="rr-nav-bell-btn"
+          onClick={onOpenNotificacoes}
+          title={unreadCount > 0 ? `${unreadCount} notificações não lidas` : 'Central de Notificações'}
+          aria-label="Abrir Central de Notificações"
+        >
+          <Bell size={19} />
+          {unreadCount > 0 && (
+            <span className="rr-nav-bell-badge">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* Data Executiva (Apenas Desktop) */}
         <div
+          className="desktop-only"
           style={{
             fontSize: '0.8rem',
             color: '#64748b',

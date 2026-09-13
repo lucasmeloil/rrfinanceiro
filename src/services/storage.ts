@@ -414,11 +414,55 @@ class StorageService {
     this.init();
     const today = getTodayIso();
     const mens = this.get<Mensalidade[]>(STORAGE_KEYS.MENSALIDADES, []);
+    const parcelas = this.getParcelas();
+
     return mens.map((m) => {
-      if (m.status !== 'pago' && m.data_vencimento < today) {
-        return { ...m, status: 'vencido' };
+      let pago = Number(m.valor_pago) || 0;
+      const total = Number(m.valor) || 0;
+
+      // Se a mensalidade possui conta vinculada, sincroniza o total pago a partir das parcelas
+      let parcelasConta = m.conta_id ? parcelas.filter((p) => p.conta_id === m.conta_id) : [];
+      if (parcelasConta.length === 0 && m.pessoa_id) {
+        const contas = this.getContas();
+        const contasDoCliente = contas.filter((c) => c.pessoa_id === m.pessoa_id);
+        const contasIds = new Set(contasDoCliente.map((c) => c.id));
+        parcelasConta = parcelas.filter(
+          (p) =>
+            contasIds.has(p.conta_id) &&
+            (p.data_vencimento === m.data_vencimento || p.data_vencimento.startsWith(m.mes_referencia))
+        );
       }
-      return m;
+
+      if (parcelasConta.length > 0) {
+        const pagoParcelas = parcelasConta.reduce((acc, p) => {
+          const vPago = Number(p.valor_pago) || 0;
+          if (vPago > 0) return acc + vPago;
+          if (p.status === 'pago') return acc + (Number(p.valor) || 0);
+          return acc;
+        }, 0);
+        if (pagoParcelas > pago) {
+          pago = pagoParcelas;
+        }
+      }
+
+      const saldoRestante = Math.max(0, Math.round((total - pago) * 100) / 100);
+
+      let status: Mensalidade['status'] = m.status;
+      if (pago >= total && total > 0) {
+        status = 'pago';
+      } else if (pago > 0 && saldoRestante > 0.01) {
+        status = 'parcial';
+      } else if (m.data_vencimento < today) {
+        status = 'vencido';
+      } else {
+        status = 'pendente';
+      }
+
+      return {
+        ...m,
+        valor_pago: pago,
+        status,
+      };
     });
   }
 

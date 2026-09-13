@@ -18,6 +18,7 @@ import {
 import { Conta, Parcela, Pessoa, TipoConta, ParcelaComPessoa } from '../../types';
 import { storageService } from '../../services/storage';
 import { formatCurrency, formatDate, getTodayDateStr } from '../../services/financialEngine';
+import { notificationService } from '../../services/notificationService';
 
 interface ContasViewProps {
   tipo: TipoConta; // 'receber' ou 'pagar'
@@ -102,6 +103,16 @@ export const ContasView: React.FC<ContasViewProps> = ({
     };
 
     storageService.saveConta(novaConta, parcelasGeradas);
+    
+    const pessoaNome = pessoas.find((p) => p.id === formPessoaId)?.nome || 'Pessoa';
+    const tipoLabel = tipo === 'receber' ? 'Conta a Receber' : 'Conta a Pagar';
+    notificationService.sucesso(
+      `${tipoLabel} Criada!`,
+      `Conta "${formDescricao}" de R$ ${formValorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em ${numParc}x cadastrada para ${pessoaNome}.`,
+      { tab: tipo === 'receber' ? 'receber' : 'pagar', label: `Ver ${tipoLabel}` },
+      'financeiro'
+    );
+
     setModalNovaConta(false);
     // Reset
     setFormDescricao('');
@@ -113,6 +124,12 @@ export const ContasView: React.FC<ContasViewProps> = ({
   const handleExcluirConta = (id: string, desc: string) => {
     if (window.confirm(`Deseja excluir a conta "${desc}" e todas as suas parcelas?`)) {
       storageService.deleteConta(id);
+      notificationService.aviso(
+        'Conta Excluída',
+        `A conta "${desc}" e suas parcelas foram excluídas.`,
+        { tab: tipo === 'receber' ? 'receber' : 'pagar', label: 'Ver Contas' },
+        'financeiro'
+      );
       onRefresh();
     }
   };
@@ -211,6 +228,12 @@ export const ContasView: React.FC<ContasViewProps> = ({
             const isExpanded = expandedContas[conta.id] !== false; // Padrão expandido
             const parcelas = conta.parcelas || [];
             const pagasCount = parcelas.filter((p) => p.status === 'pago').length;
+            const totalPago = parcelas.reduce(
+              (acc, p) => acc + (Number(p.valor_pago) || (p.status === 'pago' ? Number(p.valor) : 0)),
+              0
+            );
+            const saldoRestante = Math.max(0, Math.round((Number(conta.valor_total) - totalPago) * 100) / 100);
+            const isParcial = totalPago > 0 && saldoRestante > 0.01;
 
             return (
               <div key={conta.id} className="card" style={{ padding: '1rem' }}>
@@ -267,9 +290,17 @@ export const ContasView: React.FC<ContasViewProps> = ({
                       <div style={{ fontWeight: 800, fontSize: '1.15rem', color: isReceber ? '#2563eb' : '#dc2626' }}>
                         {formatCurrency(conta.valor_total)}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                        {pagasCount} de {parcelas.length} parcelas quitadas
-                      </div>
+                      {isParcial ? (
+                        <div style={{ fontSize: '0.76rem', marginTop: '0.15rem' }}>
+                          <span style={{ color: '#16a34a', fontWeight: 700 }}>Pago: {formatCurrency(totalPago)}</span>
+                          {' • '}
+                          <span style={{ color: '#d97706', fontWeight: 800 }}>Restante: {formatCurrency(saldoRestante)}</span>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                          {pagasCount} de {parcelas.length} parcelas quitadas
+                        </div>
+                      )}
                     </div>
 
                     <button

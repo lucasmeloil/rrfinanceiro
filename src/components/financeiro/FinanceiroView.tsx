@@ -26,6 +26,7 @@ import { Conta, Parcela, Pessoa, TipoConta, ParcelaComPessoa, FiltrosRelatorio }
 import { storageService } from '../../services/storage';
 import { formatCurrency, formatDate, getTodayDateStr, formatFormaPagamento } from '../../services/financialEngine';
 import { exportarRelatorioExcel } from '../../services/excelExport';
+import { notificationService } from '../../services/notificationService';
 
 interface FinanceiroViewProps {
   contas: Conta[];
@@ -195,9 +196,20 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
         dataFim,
       };
       await exportarRelatorioExcel(filtrosPayload, parcelasParaBaixa);
+      notificationService.sucesso(
+        'Relatório Excel Exportado!',
+        `Planilha financeira baixada com sucesso com ${parcelasParaBaixa.length} registros e análise contábil.`,
+        undefined,
+        'financeiro'
+      );
     } catch (err) {
       console.error('Erro na exportação Excel:', err);
-      alert('Houve um erro ao gerar a planilha Excel executiva.');
+      notificationService.erro(
+        'Falha na Exportação',
+        'Houve um erro ao gerar a planilha Excel executiva.',
+        undefined,
+        'financeiro'
+      );
     } finally {
       setExportando(false);
     }
@@ -259,13 +271,24 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
 
       await storageService.saveConta(novaConta, parcelasGeradas);
 
+      const pessoaNome = pessoas.find((p) => p.id === formPessoaId)?.nome || 'Cliente/Fornecedor';
+      const tipoNome = formTipo === 'receber' ? 'Receita / Faturamento' : 'Despesa a Pagar';
+      notificationService.sucesso(
+        `${tipoNome} Cadastrado!`,
+        `Conta "${formDescricao}" de R$ ${formValorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} em ${numParc}x para ${pessoaNome}.`,
+        { tab: 'financeiro', label: 'Ver Faturamento' },
+        'financeiro'
+      );
+
       setModalNovoFaturamento(false);
       setFormDescricao('');
       setFormValorTotal(0);
       setFormNumParcelas(1);
       onRefresh();
     } catch (err: any) {
-      setErroForm(err.message || 'Erro ao registrar faturamento.');
+      const msg = err.message || 'Erro ao registrar faturamento.';
+      setErroForm(msg);
+      notificationService.erro('Erro ao Salvar Faturamento', msg, undefined, 'financeiro');
     } finally {
       setSalvandoConta(false);
     }
@@ -274,6 +297,12 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
   const handleExcluirConta = async (id: string, desc: string) => {
     if (window.confirm(`Deseja realmente excluir a fatura/conta "${desc}" e todas as suas parcelas do sistema e do banco de dados?`)) {
       await storageService.deleteConta(id);
+      notificationService.aviso(
+        'Conta Excluída',
+        `A fatura/conta "${desc}" e suas parcelas foram excluídas do sistema.`,
+        { tab: 'financeiro', label: 'Atualizar' },
+        'financeiro'
+      );
       onRefresh();
     }
   };
@@ -626,6 +655,12 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                     const isReceber = conta.tipo === 'receber';
                     const isExpanded = !!expandedContas[conta.id];
                     const parcelasConta = parcelas.filter((p) => p.conta_id === conta.id);
+                    const totalPagoConta = parcelasConta.reduce(
+                      (acc, p) => acc + (Number(p.valor_pago) || (p.status === 'pago' ? Number(p.valor) : 0)),
+                      0
+                    );
+                    const saldoRestanteConta = Math.max(0, Math.round((Number(conta.valor_total) - totalPagoConta) * 100) / 100);
+                    const isParcialConta = totalPagoConta > 0 && saldoRestanteConta > 0.01;
 
                     return (
                       <React.Fragment key={conta.id}>
@@ -645,8 +680,16 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                           </td>
                           <td>{formatDate(conta.data_emissao)}</td>
                           <td>{formatDate(conta.data_vencimento)}</td>
-                          <td style={{ textAlign: 'right', fontWeight: 800 }}>
-                            {formatCurrency(conta.valor_total)}
+                          <td style={{ textAlign: 'right' }}>
+                            <div style={{ fontWeight: 800, color: isReceber ? '#2563eb' : '#dc2626' }}>
+                              {formatCurrency(conta.valor_total)}
+                            </div>
+                            {isParcialConta && (
+                              <div style={{ fontSize: '0.73rem', marginTop: '2px', lineHeight: '1.2' }}>
+                                <span style={{ color: '#16a34a', fontWeight: 600 }}>Pago: {formatCurrency(totalPagoConta)}</span>
+                                <div style={{ color: '#d97706', fontWeight: 800 }}>Restante: {formatCurrency(saldoRestanteConta)}</div>
+                              </div>
+                            )}
                           </td>
                           <td>
                             <span
@@ -777,6 +820,12 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                 const isExpanded = !!expandedContas[conta.id];
                 const parcelasConta = parcelas.filter((p) => p.conta_id === conta.id);
                 const pagasCount = parcelasConta.filter((p) => p.status === 'pago').length;
+                const totalPagoConta = parcelasConta.reduce(
+                  (acc, p) => acc + (Number(p.valor_pago) || (p.status === 'pago' ? Number(p.valor) : 0)),
+                  0
+                );
+                const saldoRestanteConta = Math.max(0, Math.round((Number(conta.valor_total) - totalPagoConta) * 100) / 100);
+                const isParcialConta = totalPagoConta > 0 && saldoRestanteConta > 0.01;
 
                 return (
                   <div key={conta.id} className="financeiro-mobile-card">
@@ -852,6 +901,13 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                         </div>
                       </div>
                     </div>
+
+                    {isParcialConta && (
+                      <div style={{ backgroundColor: '#fffbeb', border: '1px solid #fef3c7', borderRadius: '8px', padding: '0.45rem 0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.8rem' }}>
+                        <span style={{ color: '#16a34a', fontWeight: 700 }}>Pago: {formatCurrency(totalPagoConta)}</span>
+                        <span style={{ color: '#b45309', fontWeight: 800 }}>Saldo Restante: {formatCurrency(saldoRestanteConta)}</span>
+                      </div>
+                    )}
 
                     <button
                       type="button"
