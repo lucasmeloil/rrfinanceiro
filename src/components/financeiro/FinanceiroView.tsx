@@ -101,7 +101,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
         totalPagarRealizado += vp;
       }
 
-      if (p.status === 'vencido' || (p.status !== 'pago' && p.data_vencimento < hoje)) {
+      if (p.status !== 'pago' && p.data_vencimento < hoje) {
         totalVencido += Math.max(0, v - vp);
       }
     });
@@ -1119,7 +1119,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                 const isReceber = par.tipoConta === 'receber';
                 const isComp = par.is_complementar;
                 const isPago = par.status === 'pago';
-                const isVencido = par.status === 'vencido' || (par.status !== 'pago' && par.data_vencimento < hoje);
+                const isVencido = par.status !== 'pago' && par.data_vencimento < hoje;
 
                 return (
                   <div key={par.id} className="financeiro-mobile-card">

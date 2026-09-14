@@ -378,12 +378,13 @@ export const financialEngine = {
           if (isReceber) totalRecebidoMes += valorPago || valor;
           else totalPagoMes += valorPago || valor;
         }
-      } else if (par.status === 'vencido' || par.data_vencimento < today) {
+      } else if (par.data_vencimento < today) {
+        // Vencido APENAS após virar o dia da data de vencimento (< today)
         if (isReceber) totalReceberVencido += valor;
         else totalPagarVencido += valor;
         parcelasVencidas.push(par);
       } else {
-        // Pendente no prazo
+        // Pendente no prazo (incluindo vencimentos de hoje)
         if (isReceber) totalReceberPendente += valor;
         else totalPagarPendente += valor;
 
@@ -467,7 +468,7 @@ export const financialEngine = {
     const today = getTodayDateStr();
     let tipoAlvo: 'em_atraso' | 'vence_hoje' | 'vencimento_proximo' = 'vencimento_proximo';
 
-    if (parcela.status === 'vencido' || parcela.data_vencimento < today) {
+    if (parcela.data_vencimento < today) {
       tipoAlvo = 'em_atraso';
     } else if (parcela.data_vencimento === today) {
       tipoAlvo = 'vence_hoje';

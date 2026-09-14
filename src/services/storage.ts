@@ -296,12 +296,25 @@ class StorageService {
   // --- CONTAS ---
   public getContas(): Conta[] {
     this.init();
+    const today = getTodayIso();
     const contas = this.get<Conta[]>(STORAGE_KEYS.CONTAS, []);
     const parcelas = this.getParcelas();
-    return contas.map((conta) => ({
-      ...conta,
-      parcelas: parcelas.filter((par) => par.conta_id === conta.id),
-    }));
+    return contas.map((conta) => {
+      const parcelasConta = parcelas.filter((par) => par.conta_id === conta.id);
+      let status = conta.status;
+      // Recalcula dinamicamente se não estiver quitada nem parcialmente paga
+      if (status !== 'pago' && status !== 'parcial') {
+        const algumaVencida = parcelasConta.length > 0
+          ? parcelasConta.some((p) => p.status !== 'pago' && p.data_vencimento < today)
+          : (conta.data_vencimento ? conta.data_vencimento < today : false);
+        status = algumaVencida ? 'vencido' : 'pendente';
+      }
+      return {
+        ...conta,
+        status,
+        parcelas: parcelasConta,
+      };
+    });
   }
 
   public getContaById(id: string): Conta | undefined {
@@ -353,8 +366,13 @@ class StorageService {
     const today = getTodayIso();
     const parcelas = this.get<Parcela[]>(STORAGE_KEYS.PARCELAS, []);
     return parcelas.map((par) => {
-      if (par.status !== 'pago' && par.data_vencimento < today) {
+      if (par.status === 'pago') return par;
+      // Conta só deve aparecer com status vencida quando virar o dia da data de vencimento (< today) e NÃO no dia
+      if (par.data_vencimento < today) {
         return { ...par, status: 'vencido' };
+      } else if (par.status === 'vencido') {
+        // Se a data de vencimento for hoje ou futura, o status é pendente (não virou o dia ainda)
+        return { ...par, status: 'pendente' };
       }
       return par;
     });
@@ -384,9 +402,11 @@ class StorageService {
     const parcelas = this.getParcelas().filter((p) => p.conta_id === contaId);
     if (parcelas.length === 0) return;
 
+    const today = getTodayIso();
     const todasPagas = parcelas.every((p) => p.status === 'pago');
     const algumaPaga = parcelas.some((p) => p.status === 'pago' || (p.valor_pago && p.valor_pago > 0));
-    const algumaVencida = parcelas.some((p) => p.status === 'vencido');
+    // Só é vencida após virar o dia (< today)
+    const algumaVencida = parcelas.some((p) => p.status !== 'pago' && p.data_vencimento < today);
 
     let novoStatus: Conta['status'] = 'pendente';
     if (todasPagas) {

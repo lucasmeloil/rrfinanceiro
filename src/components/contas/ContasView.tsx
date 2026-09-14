@@ -169,9 +169,9 @@ export const ContasView: React.FC<ContasViewProps> = ({
     let matchChip = true;
     const parcelas = c.parcelas || [];
     if (chipFiltro === 'vencidos') {
-      matchChip =
-        c.status === 'vencido' ||
-        parcelas.some((p) => p.status === 'vencido' || (p.status !== 'pago' && p.data_vencimento < hojeStr));
+      matchChip = parcelas.length > 0
+        ? parcelas.some((p) => p.status !== 'pago' && p.data_vencimento < hojeStr)
+        : (c.status !== 'pago' && c.data_vencimento < hojeStr);
     } else if (chipFiltro === 'hoje') {
       matchChip = parcelas.some((p) => p.status !== 'pago' && p.data_vencimento === hojeStr);
     } else if (chipFiltro === 'proximos7') {

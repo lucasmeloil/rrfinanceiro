@@ -181,7 +181,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
 
     if (item.status === 'pago' || saldo <= 0.01) {
       qtdPago++;
-    } else if (item.status === 'vencido' || isAtrasado) {
+    } else if (isAtrasado) {
       qtdVencido++;
       valorVencido += saldo;
     } else {
@@ -219,8 +219,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
     cAtual.totalPrevisto += val;
     cAtual.totalPago += pago;
     cAtual.totalSaldo += saldo;
-    if (isAtrasado || item.status === 'vencido') cAtual.temVencido = true;
-    if (item.status === 'pendente') cAtual.temPendente = true;
+    if (isAtrasado) cAtual.temVencido = true;
+    if (item.status === 'pendente' || (!isAtrasado && item.status !== 'pago')) cAtual.temPendente = true;
     if (cAtual.tipo !== item.tipoConta) cAtual.tipo = 'misto';
     if (item.forma_pagamento) cAtual.formaPreferencial = formatFormaPagamento(item.forma_pagamento);
     clientesMap.set(pNome, cAtual);
@@ -964,7 +964,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       diasAtraso = Math.ceil(Math.abs(hDate.getTime() - vDate.getTime()) / (1000 * 60 * 60 * 24));
     }
 
-    const statusTexto = item.status === 'pago' ? 'PAGO' : item.status === 'vencido' || diasAtraso > 0 ? 'VENCIDO' : 'PENDENTE';
+    const statusTexto = item.status === 'pago' ? 'PAGO' : diasAtraso > 0 ? 'VENCIDO' : 'PENDENTE';
     const formaTexto = item.forma_pagamento
       ? formatFormaPagamento(item.forma_pagamento)
       : item.status === 'pago'

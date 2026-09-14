@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BellRing,
   AlertTriangle,
@@ -31,6 +31,7 @@ interface CobrancasViewProps {
 export const CobrancasView: React.FC<CobrancasViewProps> = ({ parcelas }) => {
   const [secaoPrincipal, setSecaoPrincipal] = useState<'disparos' | 'templates'>('disparos');
   const [tabCobranca, setTabCobranca] = useState<'vencidas' | 'hoje' | 'proximas'>('vencidas');
+  const [tabInicializada, setTabInicializada] = useState(false);
   const [busca, setBusca] = useState('');
 
   // Modal de Envio de Mensagem customizada com templates
@@ -50,13 +51,22 @@ export const CobrancasView: React.FC<CobrancasViewProps> = ({ parcelas }) => {
   // Apenas contas a receber pendentes ou vencidas
   const parcelasReceber = parcelas.filter((p) => p.tipoConta === 'receber' && p.status !== 'pago');
 
-  const vencidas = parcelasReceber.filter(
-    (p) => p.status === 'vencido' || p.data_vencimento < today
-  );
+  // Conta só deve aparecer com status vencida quando virar o dia da data de vencimento (< today) e NÃO no dia
+  const vencidas = parcelasReceber.filter((p) => p.data_vencimento < today);
   const vencemHoje = parcelasReceber.filter((p) => p.data_vencimento === today);
   const proximas = parcelasReceber.filter(
     (p) => p.data_vencimento > today && p.data_vencimento <= next7DaysStr
   );
+
+  // Se não houver faturas vencidas em atraso, foca automaticamente nos vencimentos de hoje
+  useEffect(() => {
+    if (!tabInicializada && parcelasReceber.length > 0) {
+      if (vencidas.length === 0 && vencemHoje.length > 0) {
+        setTabCobranca('hoje');
+      }
+      setTabInicializada(true);
+    }
+  }, [tabInicializada, parcelasReceber.length, vencidas.length, vencemHoje.length]);
 
   const getListaAtiva = () => {
     switch (tabCobranca) {
