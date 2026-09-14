@@ -21,12 +21,14 @@ import {
   Percent,
   RefreshCw,
   Wallet,
+  FileText,
 } from 'lucide-react';
 import { Conta, Parcela, Pessoa, TipoConta, ParcelaComPessoa, FiltrosRelatorio } from '../../types';
 import { storageService } from '../../services/storage';
 import { formatCurrency, formatDate, getTodayDateStr, formatFormaPagamento } from '../../services/financialEngine';
 import { exportarRelatorioExcel } from '../../services/excelExport';
 import { notificationService } from '../../services/notificationService';
+import { baixarReciboPdf, criarDadosReciboDeParcela } from '../../services/receiptService';
 
 interface FinanceiroViewProps {
   contas: Conta[];
@@ -796,7 +798,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                                         )}
                                       </div>
 
-                                      {par.status !== 'pago' && (
+                                      {par.status !== 'pago' ? (
                                         <button
                                           className="btn btn-success btn-sm"
                                           onClick={() => onDarBaixa(par)}
@@ -804,6 +806,17 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                                         >
                                           <CheckCircle2 size={14} />
                                           <span>Dar Baixa / Receber</span>
+                                        </button>
+                                      ) : (
+                                        <button
+                                          type="button"
+                                          className="btn btn-secondary btn-sm"
+                                          onClick={() => baixarReciboPdf(criarDadosReciboDeParcela(par))}
+                                          style={{ width: '100%', marginTop: '0.6rem', padding: '0.35rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem' }}
+                                          title="Baixar Recibo Oficial em PDF"
+                                        >
+                                          <FileText size={14} />
+                                          <span>Recibo em PDF</span>
                                         </button>
                                       )}
                                     </div>
@@ -974,7 +987,7 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                                 </div>
                               )}
 
-                              {!isParPago && (
+                              {!isParPago ? (
                                 <button
                                   type="button"
                                   className="btn btn-success btn-sm"
@@ -992,6 +1005,25 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                                 >
                                   <CheckCircle2 size={16} />
                                   <span>Dar Baixa / Receber</span>
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-sm"
+                                  onClick={() => baixarReciboPdf(criarDadosReciboDeParcela(par))}
+                                  style={{
+                                    width: '100%',
+                                    marginTop: '0.6rem',
+                                    minHeight: '40px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    gap: '0.4rem',
+                                    fontWeight: 700,
+                                  }}
+                                >
+                                  <FileText size={15} />
+                                  <span>Baixar Recibo em PDF</span>
                                 </button>
                               )}
                             </div>
@@ -1092,9 +1124,21 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           {isPago ? (
-                            <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 700 }}>
-                              ✓ Liquidada {par.forma_pagamento ? `(${formatFormaPagamento(par.forma_pagamento)})` : ''}
-                            </span>
+                            <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', justifyContent: 'center' }}>
+                              <span style={{ fontSize: '0.8rem', color: '#16a34a', fontWeight: 700 }}>
+                                ✓ Liquidada {par.forma_pagamento ? `(${formatFormaPagamento(par.forma_pagamento)})` : ''}
+                              </span>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => baixarReciboPdf(criarDadosReciboDeParcela(par))}
+                                title="Baixar Recibo Oficial em PDF"
+                                style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                              >
+                                <FileText size={13} />
+                                <span>Recibo</span>
+                              </button>
+                            </div>
                           ) : (
                             <button
                               className="btn btn-success btn-sm"
@@ -1177,8 +1221,27 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
 
                     <div>
                       {isPago ? (
-                        <div style={{ textAlign: 'center', padding: '0.5rem', backgroundColor: '#f0fdf4', borderRadius: '8px', color: '#166534', fontWeight: 700, fontSize: '0.88rem' }}>
-                          ✓ Liquidada em {formatDate(par.data_pagamento || '')} {par.forma_pagamento ? `via ${formatFormaPagamento(par.forma_pagamento)}` : ''}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                          <div style={{ textAlign: 'center', padding: '0.5rem', backgroundColor: '#f0fdf4', borderRadius: '8px', color: '#166534', fontWeight: 700, fontSize: '0.88rem' }}>
+                            ✓ Liquidada em {formatDate(par.data_pagamento || '')} {par.forma_pagamento ? `via ${formatFormaPagamento(par.forma_pagamento)}` : ''}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => baixarReciboPdf(criarDadosReciboDeParcela(par))}
+                            style={{
+                              width: '100%',
+                              minHeight: '40px',
+                              fontWeight: 700,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '0.4rem',
+                            }}
+                          >
+                            <FileText size={15} />
+                            <span>Baixar Recibo Oficial em PDF</span>
+                          </button>
                         </div>
                       ) : (
                         <button
