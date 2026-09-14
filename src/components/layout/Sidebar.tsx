@@ -76,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onLogout,
 }) => {
   const isFinanceiroTab = activeTab === 'receber' || activeTab === 'pagar';
-  const [financeiroExpanded, setFinanceiroExpanded] = React.useState<boolean>(true);
+  const [financeiroExpanded, setFinanceiroExpanded] = React.useState<boolean>(false);
 
   React.useEffect(() => {
     if (isFinanceiroTab) {
@@ -214,9 +214,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                             return;
                           }
                           setFinanceiroExpanded((prev) => !prev);
-                          if (!isFinanceiroTab) {
-                            handleNavClick('receber');
-                          }
                         }}
                         title={isEffectivelyCollapsed ? item.label : undefined}
                         style={{ justifyContent: 'space-between' }}
