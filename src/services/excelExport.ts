@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { storageService } from './storage';
 import { ParcelaComPessoa, FiltrosRelatorio, FormaPagamento } from '../types';
-import { financialEngine, formatDate, formatFormaPagamento } from './financialEngine';
+import { financialEngine, formatDate, formatFormaPagamento, getTodayDateStr } from './financialEngine';
 
 // =========================================================================
 // PALETA DE CORES EXECUTIVA VIVA E DE ALTO CONTRASTE (ARGB)
@@ -111,7 +111,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   // =========================================================================
   // APURAÇÃO CONSOLIDADA DOS DADOS EM TEMPO REAL
   // =========================================================================
-  const hojeStr = new Date().toISOString().split('T')[0];
+  const hojeStr = getTodayDateStr();
   let totalRecebido = 0;
   let totalReceberPendente = 0;
   let totalReceberPrevisto = 0;

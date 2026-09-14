@@ -64,15 +64,21 @@ export const CONFIG_PADRAO: ConfiguracoesApp = {
   supabaseAnonKey: import.meta.env.VITE_SUPABASE_ANON_KEY || 'sb_publishable_JVEchFVme0KIYWjLrySSSA_XAI-8VI0',
 };
 
-const getTodayIso = () => {
+const getTodayIso = (): string => {
   const d = new Date();
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
-const getRelativeDate = (offsetDays: number) => {
+const getRelativeDate = (offsetDays: number): string => {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
-  return d.toISOString().split('T')[0];
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 };
 
 const SEED_PESSOAS: Pessoa[] = [];

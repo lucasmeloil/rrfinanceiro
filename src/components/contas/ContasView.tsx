@@ -416,19 +416,15 @@ export const ContasView: React.FC<ContasViewProps> = ({
                         <strong style={{ fontSize: '1.05rem', color: '#0f172a', wordBreak: 'break-word' }}>
                           {pessoa?.nome || 'Contato não identificado'}
                         </strong>
-                        <span
-                          className={`status-badge ${
-                            conta.status === 'pago'
-                              ? 'status-pago'
-                              : conta.status === 'vencido'
-                              ? 'status-vencido'
-                              : conta.status === 'parcial'
-                              ? 'status-parcial'
-                              : 'status-pendente'
-                          }`}
-                        >
-                          {conta.status.toUpperCase()}
-                        </span>
+                        {(() => {
+                          if (conta.status === 'pago') return <span className="status-badge status-pago">PAGO</span>;
+                          if (conta.status === 'parcial') return <span className="status-badge status-parcial">PARCIAL</span>;
+                          const temVencida = parcelas.some((p) => p.status !== 'pago' && p.data_vencimento < hojeStr) || (conta.data_vencimento && conta.data_vencimento < hojeStr);
+                          const temHoje = parcelas.some((p) => p.status !== 'pago' && p.data_vencimento === hojeStr) || (conta.data_vencimento === hojeStr);
+                          if (temVencida) return <span className="status-badge status-vencido">VENCIDO</span>;
+                          if (temHoje) return <span className="status-badge" style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontWeight: 700 }}>VENCE HOJE</span>;
+                          return <span className="status-badge status-pendente">A VENCER</span>;
+                        })()}
                       </div>
                       <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.2rem', wordBreak: 'break-word' }}>
                         {conta.descricao} • <span style={{ color: 'var(--text-muted)' }}>{conta.categoria}</span>
@@ -526,19 +522,22 @@ export const ContasView: React.FC<ContasViewProps> = ({
                                 </td>
                                 <td>{par.data_pagamento ? formatDate(par.data_pagamento) : '-'}</td>
                                 <td>
-                                  <span
-                                    className={`status-badge ${
-                                      par.status === 'pago'
-                                        ? 'status-pago'
-                                        : par.status === 'vencido'
-                                        ? 'status-vencido'
-                                        : par.status === 'parcial'
-                                        ? 'status-parcial'
-                                        : 'status-pendente'
-                                    }`}
-                                  >
-                                    {par.status}
-                                  </span>
+                                  {(() => {
+                                    if (par.status === 'pago') return <span className="status-badge status-pago">PAGO</span>;
+                                    if (par.status === 'parcial') return <span className="status-badge status-parcial">PARCIAL</span>;
+                                    if (par.data_vencimento < hojeStr) return <span className="status-badge status-vencido">VENCIDO</span>;
+                                    if (par.data_vencimento === hojeStr) {
+                                      return (
+                                        <span
+                                          className="status-badge"
+                                          style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontWeight: 700 }}
+                                        >
+                                          VENCE HOJE
+                                        </span>
+                                      );
+                                    }
+                                    return <span className="status-badge status-pendente">A VENCER</span>;
+                                  })()}
                                 </td>
                                 <td style={{ fontSize: '0.78rem', color: 'var(--text-secondary)' }}>
                                   {par.observacoes || '-'}
@@ -601,19 +600,22 @@ export const ContasView: React.FC<ContasViewProps> = ({
                                   </span>
                                 )}
                               </div>
-                              <span
-                                className={`status-badge ${
-                                  par.status === 'pago'
-                                    ? 'status-pago'
-                                    : par.status === 'vencido'
-                                    ? 'status-vencido'
-                                    : par.status === 'parcial'
-                                    ? 'status-parcial'
-                                    : 'status-pendente'
-                                }`}
-                              >
-                                {par.status.toUpperCase()}
-                              </span>
+                              {(() => {
+                                if (par.status === 'pago') return <span className="status-badge status-pago">PAGO</span>;
+                                if (par.status === 'parcial') return <span className="status-badge status-parcial">PARCIAL</span>;
+                                if (par.data_vencimento < hojeStr) return <span className="status-badge status-vencido">VENCIDO</span>;
+                                if (par.data_vencimento === hojeStr) {
+                                  return (
+                                    <span
+                                      className="status-badge"
+                                      style={{ backgroundColor: '#fef3c7', color: '#b45309', border: '1px solid #fde68a', fontWeight: 700 }}
+                                    >
+                                      VENCE HOJE
+                                    </span>
+                                  );
+                                }
+                                return <span className="status-badge status-pendente">A VENCER</span>;
+                              })()}
                             </div>
 
                             <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>

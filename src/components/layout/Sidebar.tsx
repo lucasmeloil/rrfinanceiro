@@ -16,6 +16,7 @@ import {
   LogOut,
   DollarSign,
   ChevronUp,
+  ChevronDown,
 } from 'lucide-react';
 
 export type ActiveTab =
@@ -43,14 +44,24 @@ interface SidebarProps {
   onLogout?: () => void;
 }
 
+interface NavSubItem {
+  id: ActiveTab;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  badge?: number;
+}
+
+interface NavItem {
+  id: ActiveTab | 'modulo_financeiro';
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+  badge?: number;
+  subItems?: NavSubItem[];
+}
+
 interface NavGroup {
   sectionTitle?: string;
-  items: {
-    id: ActiveTab;
-    label: string;
-    icon: React.ComponentType<{ size?: number; className?: string }>;
-    badge?: number;
-  }[];
+  items: NavItem[];
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -64,6 +75,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userEmail,
   onLogout,
 }) => {
+  const isFinanceiroTab = activeTab === 'receber' || activeTab === 'pagar';
+  const [financeiroExpanded, setFinanceiroExpanded] = React.useState<boolean>(true);
+
+  React.useEffect(() => {
+    if (isFinanceiroTab) {
+      setFinanceiroExpanded(true);
+    }
+  }, [isFinanceiroTab]);
+
   const navGroups: NavGroup[] = [
     {
       sectionTitle: 'VISÃO GERAL',
@@ -74,8 +94,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       sectionTitle: 'OPERAÇÕES',
       items: [
-        { id: 'receber', label: 'Contas a Receber', icon: ArrowDownCircle },
-        { id: 'pagar', label: 'Contas a Pagar', icon: ArrowUpCircle },
+        {
+          id: 'modulo_financeiro',
+          label: 'Financeiro',
+          icon: DollarSign,
+          subItems: [
+            { id: 'receber', label: 'Contas a Receber', icon: ArrowDownCircle },
+            { id: 'pagar', label: 'Contas a Pagar', icon: ArrowUpCircle },
+          ],
+        },
         { id: 'mensalidades', label: 'Mensalidades & Lotes', icon: CalendarDays },
         { id: 'cobrancas', label: 'Cobranças & WhatsApp', icon: BellRing, badge: alertasCount },
         { id: 'pessoas', label: 'Clientes & Fornecedores', icon: Users },
@@ -84,7 +111,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       sectionTitle: 'CONTROLADORIA',
       items: [
-        { id: 'financeiro', label: 'Extrato & Relatórios', icon: FileSpreadsheet },
+        { id: 'relatorios', label: 'Extrato & Relatórios', icon: FileSpreadsheet },
       ],
     },
     {
@@ -170,10 +197,69 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
               {group.items.map((item) => {
                 const Icon = item.icon;
-                const isActive = activeTab === item.id;
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+                const isParentActive = hasSubItems && item.subItems?.some((s) => s.id === activeTab);
+                const isActive = activeTab === item.id || isParentActive;
+
+                if (hasSubItems) {
+                  return (
+                    <div key={item.id} className="nav-item-parent">
+                      <button
+                        type="button"
+                        className={`nav-item ${isActive ? 'active' : ''}`}
+                        onClick={() => {
+                          if (isEffectivelyCollapsed && onToggleCollapse) {
+                            onToggleCollapse();
+                            setFinanceiroExpanded(true);
+                            return;
+                          }
+                          setFinanceiroExpanded((prev) => !prev);
+                          if (!isFinanceiroTab) {
+                            handleNavClick('receber');
+                          }
+                        }}
+                        title={isEffectivelyCollapsed ? item.label : undefined}
+                        style={{ justifyContent: 'space-between' }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                          <Icon size={19} />
+                          <span>{item.label}</span>
+                        </div>
+                        {!isEffectivelyCollapsed && (
+                          <span className="nav-chevron-btn">
+                            {financeiroExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                          </span>
+                        )}
+                      </button>
+
+                      {/* Submenu Expandido (Extensão de Contas a Receber e Contas a Pagar) */}
+                      {financeiroExpanded && !isEffectivelyCollapsed && (
+                        <div className="nav-subgroup">
+                          {item.subItems!.map((sub) => {
+                            const SubIcon = sub.icon;
+                            const isSubActive = activeTab === sub.id;
+                            return (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                className={`nav-subitem ${isSubActive ? 'active' : ''}`}
+                                onClick={() => handleNavClick(sub.id)}
+                              >
+                                <SubIcon size={16} />
+                                <span>{sub.label}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
                 return (
                   <button
                     key={item.id}
+                    type="button"
                     className={`nav-item ${isActive ? 'active' : ''}`}
                     onClick={() => handleNavClick(item.id as ActiveTab)}
                     title={isEffectivelyCollapsed ? item.label : undefined}

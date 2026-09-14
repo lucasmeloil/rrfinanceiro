@@ -429,6 +429,78 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid var(--status-overdue-border);
 }
 
+/* Submenu / Extensão Hierárquica do Módulo Financeiro */
+.nav-item-parent {
+  position: relative;
+}
+
+.nav-chevron-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  justifyContent: center;
+  color: #94a3b8;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.nav-item:hover .nav-chevron-btn {
+  color: #0f172a;
+}
+
+.nav-subgroup {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-left: 1.15rem;
+  padding-left: 0.85rem;
+  border-left: 2px solid #e2e8f0;
+  margin-top: 0.25rem;
+  margin-bottom: 0.5rem;
+  animation: slideDownSubnav 0.2s ease forwards;
+}
+
+@keyframes slideDownSubnav {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.nav-subitem {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--radius-md);
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 500;
+  text-decoration: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: all var(--transition-fast);
+  min-height: 36px;
+}
+
+.nav-subitem:hover {
+  color: #0f172a;
+  background-color: #f1f5f9;
+}
+
+.nav-subitem.active {
+  color: #1d4ed8;
+  background-color: #eff6ff;
+  font-weight: 700;
+  border-left: 3px solid #2563eb;
+}
+
 .sidebar-footer {
   padding: 1rem 1.25rem;
   border-top: 1px solid var(--border-subtle);
