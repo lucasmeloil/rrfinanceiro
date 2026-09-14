@@ -18,6 +18,7 @@ import { ParcelaComPessoa, WhatsAppTemplate } from '../../types';
 import { formatCurrency, formatDate, financialEngine } from '../../services/financialEngine';
 import { storageService } from '../../services/storage';
 import { notificationService } from '../../services/notificationService';
+import { normalizarTextoWhatsApp, gerarUrlApiWhatsApp } from '../../utils/whatsappUtils';
 
 interface ModalEnviarMensagemProps {
   isOpen: boolean;
@@ -74,7 +75,8 @@ export const ModalEnviarMensagem: React.FC<ModalEnviarMensagemProps> = ({
 
   const handleCopiar = () => {
     if (!mensagem.trim()) return;
-    navigator.clipboard.writeText(mensagem);
+    const msgLimpa = normalizarTextoWhatsApp(mensagem);
+    navigator.clipboard.writeText(msgLimpa);
     setCopiado(true);
     notificationService.info(
       'Mensagem Copiada!',
@@ -97,10 +99,7 @@ export const ModalEnviarMensagem: React.FC<ModalEnviarMensagemProps> = ({
       return;
     }
 
-    // Número no formato internacional Brasil 55
-    const ddiNumero = telLimpo.startsWith('55') ? telLimpo : `55${telLimpo}`;
-    const textoCodificado = encodeURIComponent(mensagem);
-    const url = `https://wa.me/${ddiNumero}?text=${textoCodificado}`;
+    const url = gerarUrlApiWhatsApp(telLimpo, mensagem);
 
     window.open(url, '_blank');
 

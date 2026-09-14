@@ -111,15 +111,25 @@
 }
 
 .auth-logo-icon {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 14px;
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  background: linear-gradient(135deg, #070b14 0%, #131c33 50%, #090e1c 100%);
+  border: 1px solid rgba(226, 232, 240, 0.22);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.28);
+  padding: 6px;
+  box-shadow: 0 8px 22px rgba(10, 17, 36, 0.38), 0 0 20px rgba(37, 99, 235, 0.25);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-logo-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.75)) contrast(1.18) brightness(1.1);
 }
 
 .auth-brand-title {

@@ -1,5 +1,6 @@
 import { storageService } from './storage';
 import { Parcela, Conta, Mensalidade, ParcelaComPessoa, ResumoDashboard, MesFluxoCaixa, WhatsAppTemplate, FormaPagamento } from '../types';
+import { normalizarTextoWhatsApp, gerarUrlApiWhatsApp } from '../utils/whatsappUtils';
 
 export interface BaixaParcelaPayload {
   parcelaId: string;
@@ -479,7 +480,7 @@ export const financialEngine = {
   },
 
   /**
-   * Gera a mensagem formatada para envio no WhatsApp
+   * Gera a mensagem formatada para envio no WhatsApp com normalização de emojis
    */
   gerarMensagemCobranca(
     parcela: ParcelaComPessoa,
@@ -497,7 +498,7 @@ export const financialEngine = {
       textoBase = sugerido ? sugerido.mensagem : '';
     }
 
-    return this.aplicarTemplate(textoBase, {
+    const mensagemFormatada = this.aplicarTemplate(textoBase, {
       nome: parcela.pessoaNome,
       valor: parcela.valor,
       vencimento: parcela.data_vencimento,
@@ -505,24 +506,22 @@ export const financialEngine = {
       descricao: parcela.descricaoConta,
       parcela: `${parcela.numero_parcela}/${parcela.total_parcelas}`,
     });
+
+    return normalizarTextoWhatsApp(mensagemFormatada);
   },
 
   /**
-   * Gerador de Link Direto para WhatsApp com mensagem personalizada
+   * Gerador de Link Direto para WhatsApp com mensagem personalizada e compatibilidade total de emojis
    */
   gerarLinkWhatsappCobranca(
     parcela: ParcelaComPessoa,
     templateOuTexto?: WhatsAppTemplate | string,
     dataEmissao?: string
   ): string {
-    const telLimpo = (parcela.pessoaTelefone || '').replace(/\D/g, '');
     const msg = this.gerarMensagemCobranca(parcela, templateOuTexto, dataEmissao);
-    const textoEncoded = encodeURIComponent(msg);
-
-    if (!telLimpo) {
-      return `https://wa.me/?text=${textoEncoded}`;
-    }
-    const telComDdi = telLimpo.startsWith('55') ? telLimpo : `55${telLimpo}`;
-    return `https://wa.me/${telComDdi}?text=${textoEncoded}`;
+    return gerarUrlApiWhatsApp(parcela.pessoaTelefone || '', msg);
   },
 };
+
+export { normalizarTextoWhatsApp, gerarUrlApiWhatsApp } from '../utils/whatsappUtils';
+

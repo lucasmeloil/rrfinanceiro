@@ -673,12 +673,11 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
               )}
             </div>
 
-            <div className="modal-footer" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <div className="modal-footer">
               <button
                 type="button"
                 className="btn btn-secondary"
                 onClick={() => setModalLoteAberto(false)}
-                style={{ minHeight: '44px', flex: '1 1 120px' }}
               >
                 Fechar
               </button>
@@ -686,7 +685,7 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                 type="button"
                 className="btn btn-primary"
                 onClick={handleExecutarLote}
-                style={{ minHeight: '44px', flex: '2 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
               >
                 <Play size={16} />
                 <span>Processar Lote Agora</span>
@@ -795,19 +794,18 @@ export const MensalidadesView: React.FC<MensalidadesViewProps> = ({
                 </div>
               </div>
 
-              <div className="modal-footer" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <div className="modal-footer">
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => setModalManualAberto(false)}
-                  style={{ minHeight: '44px', flex: '1 1 120px' }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ minHeight: '44px', flex: '2 1 180px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.4rem' }}
                 >
                   <CheckCircle2 size={16} />
                   <span>Gerar Mensalidade</span>

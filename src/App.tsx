@@ -8,7 +8,6 @@ import { ContasView } from './components/contas/ContasView';
 import { MensalidadesView } from './components/mensalidades/MensalidadesView';
 import { CobrancasView } from './components/cobrancas/CobrancasView';
 import { FinanceiroView } from './components/financeiro/FinanceiroView';
-import { RelatoriosView } from './components/relatorios/RelatoriosView';
 import { BackupConfigView } from './components/backup/BackupConfigView';
 import { GestaoUsuariosView } from './components/auth/GestaoUsuariosView';
 import { ModalBaixaParcela } from './components/contas/ModalBaixaParcela';
@@ -18,6 +17,7 @@ import { notificationService } from './services/notificationService';
 
 import { LoginView } from './components/auth/LoginView';
 import { SecurityAuditModal } from './components/auth/SecurityAuditModal';
+import { CommandPaletteModal } from './components/common/CommandPaletteModal';
 import { authService, AuthSession } from './services/authService';
 import { securityEngine } from './services/securityEngine';
 
@@ -55,8 +55,38 @@ export const App: React.FC = () => {
   const [parcelaEmBaixa, setParcelaEmBaixa] = useState<ParcelaComPessoa | null>(null);
   const [modalBaixaAberto, setModalBaixaAberto] = useState(false);
 
-  // Central de Notificações
+  // Central de Notificações & Command Palette (Ctrl+K)
   const [notificacoesOpen, setNotificacoesOpen] = useState(false);
+  const [commandPaletteOpen, setCommandPaletteOpen] = useState(false);
+  const [abrirNovaContaModal, setAbrirNovaContaModal] = useState(false);
+  const [abrirNovoClienteModal, setAbrirNovoClienteModal] = useState(false);
+
+  // Atalho global universal: Ctrl + K (ou Cmd + K) para abrir busca rápida
+  useEffect(() => {
+    const handleGlobalKeydown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeydown);
+    return () => window.removeEventListener('keydown', handleGlobalKeydown);
+  }, []);
+
+  // Auto-reset dos gatilhos de abertura rápida
+  useEffect(() => {
+    if (abrirNovaContaModal) {
+      const t = setTimeout(() => setAbrirNovaContaModal(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [abrirNovaContaModal]);
+
+  useEffect(() => {
+    if (abrirNovoClienteModal) {
+      const t = setTimeout(() => setAbrirNovoClienteModal(false), 300);
+      return () => clearTimeout(t);
+    }
+  }, [abrirNovoClienteModal]);
 
   const isUpdatingHashRef = useRef(false);
 
@@ -236,8 +266,15 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           empresaNome={config.nomeEmpresa}
           userEmail={session?.user?.email}
-          onOpenNovaConta={() => setActiveTab('receber')}
-          onOpenNovoCliente={() => setActiveTab('pessoas')}
+          onOpenCommandPalette={() => setCommandPaletteOpen(true)}
+          onOpenNovaConta={(tipo) => {
+            setActiveTab(tipo);
+            setAbrirNovaContaModal(true);
+          }}
+          onOpenNovoCliente={() => {
+            setActiveTab('pessoas');
+            setAbrirNovoClienteModal(true);
+          }}
           onOpenGerarLote={() => setActiveTab('mensalidades')}
           onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
           onOpenSecurityModal={() => setSecurityModalOpen(true)}
@@ -253,11 +290,16 @@ export const App: React.FC = () => {
               onNavigateToCobrancas={() => setActiveTab('cobrancas')}
               onNavigateToReceber={() => setActiveTab('receber')}
               onNavigateToPagar={() => setActiveTab('pagar')}
+              onNavigateToFinanceiro={() => setActiveTab('financeiro')}
             />
           )}
 
           {activeTab === 'pessoas' && (
-            <PessoasView pessoas={pessoas} onRefresh={carregarDados} />
+            <PessoasView
+              pessoas={pessoas}
+              onRefresh={carregarDados}
+              onOpenNovoClienteModal={abrirNovoClienteModal}
+            />
           )}
 
           {activeTab === 'receber' && (
@@ -267,6 +309,8 @@ export const App: React.FC = () => {
               pessoas={pessoas}
               onRefresh={carregarDados}
               onDarBaixaParcela={handleAbrirBaixa}
+              onAlternarTipo={(novoTipo) => setActiveTab(novoTipo)}
+              abrirNovaContaInicial={abrirNovaContaModal}
             />
           )}
 
@@ -277,6 +321,8 @@ export const App: React.FC = () => {
               pessoas={pessoas}
               onRefresh={carregarDados}
               onDarBaixaParcela={handleAbrirBaixa}
+              onAlternarTipo={(novoTipo) => setActiveTab(novoTipo)}
+              abrirNovaContaInicial={abrirNovaContaModal}
             />
           )}
 
@@ -322,6 +368,8 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           setActiveTab={setActiveTab}
           alertasCount={alertasCount}
+          onOpenMenu={() => setMobileMenuOpen(true)}
+          onOpenQuickActions={() => setCommandPaletteOpen(true)}
         />
       </div>
 
@@ -331,6 +379,29 @@ export const App: React.FC = () => {
         parcela={parcelaEmBaixa}
         onClose={() => setModalBaixaAberto(false)}
         onSuccess={handleBaixaConcluida}
+      />
+
+      {/* Busca Global & Command Palette (Ctrl+K) */}
+      <CommandPaletteModal
+        isOpen={commandPaletteOpen}
+        onClose={() => setCommandPaletteOpen(false)}
+        pessoas={pessoas}
+        parcelas={parcelasEnriquecidas}
+        onNavigateTab={(tab) => {
+          setActiveTab(tab);
+          setCommandPaletteOpen(false);
+        }}
+        onDarBaixaParcela={handleAbrirBaixa}
+        onOpenNovaConta={(tipo) => {
+          setActiveTab(tipo);
+          setAbrirNovaContaModal(true);
+          setCommandPaletteOpen(false);
+        }}
+        onOpenNovoCliente={() => {
+          setActiveTab('pessoas');
+          setAbrirNovoClienteModal(true);
+          setCommandPaletteOpen(false);
+        }}
       />
 
       {/* Modal de Cibersegurança & Auditoria */}

@@ -157,7 +157,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSecu
           <div>
             <div className="auth-brand-header">
               <div className="auth-logo-icon">
-                <ShieldCheck size={30} />
+                <img src="/logo-rr.png" alt="RR Financeiro" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
               </div>
               <div>
                 <div className="auth-brand-title">RR Financeiro</div>
@@ -221,7 +221,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onOpenSecu
           {/* Header visível apenas em Mobile */}
           <div className="auth-mobile-header">
             <div className="auth-logo-icon mobile">
-              <ShieldCheck size={26} />
+              <img src="/logo-rr.png" alt="RR Financeiro" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
             </div>
             <div className="auth-mobile-brand">
               <div className="auth-mobile-title">RR Financeiro</div>

@@ -26,6 +26,8 @@ interface ContasViewProps {
   pessoas: Pessoa[];
   onRefresh: () => void;
   onDarBaixaParcela: (parcela: ParcelaComPessoa) => void;
+  onAlternarTipo?: (novoTipo: TipoConta) => void;
+  abrirNovaContaInicial?: boolean;
 }
 
 export const ContasView: React.FC<ContasViewProps> = ({
@@ -34,11 +36,20 @@ export const ContasView: React.FC<ContasViewProps> = ({
   pessoas,
   onRefresh,
   onDarBaixaParcela,
+  onAlternarTipo,
+  abrirNovaContaInicial,
 }) => {
   const [busca, setBusca] = useState('');
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
+  const [chipFiltro, setChipFiltro] = useState<'todos' | 'vencidos' | 'hoje' | 'proximos7' | 'pagos' | 'parciais'>('todos');
   const [expandedContas, setExpandedContas] = useState<Record<string, boolean>>({});
   const [modalNovaConta, setModalNovaConta] = useState(false);
+
+  React.useEffect(() => {
+    if (abrirNovaContaInicial) {
+      setModalNovaConta(true);
+    }
+  }, [abrirNovaContaInicial]);
 
   // Estados formulário de nova conta
   const [formPessoaId, setFormPessoaId] = useState('');
@@ -134,7 +145,12 @@ export const ContasView: React.FC<ContasViewProps> = ({
     }
   };
 
-  // Filtragem
+  // Filtragem e Métricas
+  const hojeStr = getTodayDateStr();
+  const d7 = new Date();
+  d7.setDate(d7.getDate() + 7);
+  const d7Str = d7.toISOString().split('T')[0];
+
   const contasDoTipo = contas.filter((c) => c.tipo === tipo);
 
   const contasFiltradas = contasDoTipo.filter((c) => {
@@ -149,23 +165,81 @@ export const ContasView: React.FC<ContasViewProps> = ({
 
     const matchStatus = filtroStatus === 'todos' || c.status === filtroStatus;
 
-    return matchBusca && matchStatus;
+    // Filtro por Chip rápido
+    let matchChip = true;
+    const parcelas = c.parcelas || [];
+    if (chipFiltro === 'vencidos') {
+      matchChip =
+        c.status === 'vencido' ||
+        parcelas.some((p) => p.status === 'vencido' || (p.status !== 'pago' && p.data_vencimento < hojeStr));
+    } else if (chipFiltro === 'hoje') {
+      matchChip = parcelas.some((p) => p.status !== 'pago' && p.data_vencimento === hojeStr);
+    } else if (chipFiltro === 'proximos7') {
+      matchChip = parcelas.some(
+        (p) => p.status !== 'pago' && p.data_vencimento > hojeStr && p.data_vencimento <= d7Str
+      );
+    } else if (chipFiltro === 'pagos') {
+      matchChip = c.status === 'pago';
+    } else if (chipFiltro === 'parciais') {
+      matchChip = c.status === 'parcial';
+    }
+
+    return matchBusca && matchStatus && matchChip;
   });
 
   const isReceber = tipo === 'receber';
   const pessoasDisponiveis = pessoas.filter(
-    (p) => isReceber ? (p.tipo === 'cliente' || p.tipo === 'ambos') : (p.tipo === 'fornecedor' || p.tipo === 'ambos')
+    (p) => (isReceber ? p.tipo === 'cliente' || p.tipo === 'ambos' : p.tipo === 'fornecedor' || p.tipo === 'ambos')
   );
+
+  // Estatísticas do filtro ativo
+  const totalFiltradoValor = contasFiltradas.reduce((acc, c) => acc + Number(c.valor_total || 0), 0);
+  const totalFiltradoQuitado = contasFiltradas.reduce((acc, c) => {
+    const pags = (c.parcelas || []).reduce(
+      (pacc, p) => pacc + (Number(p.valor_pago) || (p.status === 'pago' ? Number(p.valor) : 0)),
+      0
+    );
+    return acc + pags;
+  }, 0);
+  const totalFiltradoRestante = Math.max(0, totalFiltradoValor - totalFiltradoQuitado);
 
   return (
     <div className="page-wrapper">
-      {/* Controles do Topo Fluidos para Mobile */}
+      {/* 1. Alternador Segmentado Rápido [ A Receber | A Pagar ] */}
+      {onAlternarTipo && (
+        <div className="segmented-control-container" style={{ marginBottom: '1.25rem' }}>
+          <button
+            type="button"
+            className={`segmented-control-btn ${isReceber ? 'active-receber' : ''}`}
+            onClick={() => onAlternarTipo('receber')}
+          >
+            <ArrowDownCircle size={17} />
+            <span>Contas a Receber</span>
+            <span className="segmented-badge">
+              {contas.filter((c) => c.tipo === 'receber' && c.status !== 'pago').length} abertas
+            </span>
+          </button>
+          <button
+            type="button"
+            className={`segmented-control-btn ${!isReceber ? 'active-pagar' : ''}`}
+            onClick={() => onAlternarTipo('pagar')}
+          >
+            <ArrowUpCircle size={17} />
+            <span>Contas a Pagar</span>
+            <span className="segmented-badge">
+              {contas.filter((c) => c.tipo === 'pagar' && c.status !== 'pago').length} abertas
+            </span>
+          </button>
+        </div>
+      )}
+
+      {/* 2. Barra de Busca, Status e Botão Criar */}
       <div
         style={{
           display: 'flex',
           flexDirection: 'column',
           gap: '0.75rem',
-          marginBottom: '1.25rem',
+          marginBottom: '0.85rem',
         }}
       >
         <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', width: '100%' }}>
@@ -196,16 +270,96 @@ export const ContasView: React.FC<ContasViewProps> = ({
             <option value="vencido">Vencidos</option>
             <option value="parcial">Parciais</option>
           </select>
+
+          <button
+            className="btn btn-primary"
+            onClick={() => setModalNovaConta(true)}
+            style={{
+              minHeight: '42px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            <PlusCircle size={18} />
+            <span>{isReceber ? 'Nova Conta a Receber' : 'Nova Conta a Pagar'}</span>
+          </button>
         </div>
 
-        <button
-          className="btn btn-primary"
-          onClick={() => setModalNovaConta(true)}
-          style={{ minHeight: '46px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}
-        >
-          <PlusCircle size={18} />
-          <span>{isReceber ? 'Nova Conta a Receber' : 'Nova Conta a Pagar'}</span>
-        </button>
+        {/* 3. Chips de Filtros Rápidos */}
+        <div className="filter-chips-row">
+          <button
+            type="button"
+            className={`filter-chip ${chipFiltro === 'todos' ? 'active' : ''}`}
+            onClick={() => setChipFiltro('todos')}
+          >
+            Todos ({contasDoTipo.length})
+          </button>
+          <button
+            type="button"
+            className={`filter-chip chip-vencidos ${chipFiltro === 'vencidos' ? 'active' : ''}`}
+            onClick={() => setChipFiltro('vencidos')}
+          >
+            🔴 Vencidos
+          </button>
+          <button
+            type="button"
+            className={`filter-chip chip-hoje ${chipFiltro === 'hoje' ? 'active' : ''}`}
+            onClick={() => setChipFiltro('hoje')}
+          >
+            🟡 Vence Hoje
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${chipFiltro === 'proximos7' ? 'active' : ''}`}
+            onClick={() => setChipFiltro('proximos7')}
+          >
+            ⏱️ Próximos 7 Dias
+          </button>
+          <button
+            type="button"
+            className={`filter-chip chip-quitados ${chipFiltro === 'pagos' ? 'active' : ''}`}
+            onClick={() => setChipFiltro('pagos')}
+          >
+            🟢 Quitados
+          </button>
+          <button
+            type="button"
+            className={`filter-chip ${chipFiltro === 'parciais' ? 'active' : ''}`}
+            onClick={() => setChipFiltro('parciais')}
+          >
+            🟣 Parciais
+          </button>
+        </div>
+
+        {/* 4. Mini Barra Resumida de Totais do Filtro */}
+        <div className="contas-summary-bar">
+          <div className="contas-summary-item">
+            <span className="summary-label">Lançamentos:</span>
+            <strong className="summary-value">{contasFiltradas.length}</strong>
+          </div>
+          <div className="contas-summary-divider" />
+          <div className="contas-summary-item">
+            <span className="summary-label">Total Previsto:</span>
+            <strong className="summary-value">{formatCurrency(totalFiltradoValor)}</strong>
+          </div>
+          <div className="contas-summary-divider" />
+          <div className="contas-summary-item">
+            <span className="summary-label">{isReceber ? 'Recebido:' : 'Pago:'}</span>
+            <strong className="summary-value" style={{ color: '#16a34a' }}>
+              {formatCurrency(totalFiltradoQuitado)}
+            </strong>
+          </div>
+          <div className="contas-summary-divider" />
+          <div className="contas-summary-item">
+            <span className="summary-label">Restante:</span>
+            <strong className="summary-value" style={{ color: totalFiltradoRestante > 0 ? (isReceber ? '#2563eb' : '#dc2626') : '#64748b' }}>
+              {formatCurrency(totalFiltradoRestante)}
+            </strong>
+          </div>
+        </div>
       </div>
 
       {/* Lista de Contas com Acordeão para Parcelas */}
@@ -653,19 +807,18 @@ export const ContasView: React.FC<ContasViewProps> = ({
                 </div>
               </div>
 
-              <div className="modal-footer" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+              <div className="modal-footer">
                 <button
                   type="button"
                   className="btn btn-secondary"
                   onClick={() => setModalNovaConta(false)}
-                  style={{ minHeight: '46px', flex: '1 1 120px' }}
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  style={{ minHeight: '46px', flex: '2 1 200px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
                 >
                   <CheckCircle2 size={16} />
                   <span>Cadastrar Conta</span>

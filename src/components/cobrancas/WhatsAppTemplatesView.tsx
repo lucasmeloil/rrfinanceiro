@@ -94,7 +94,7 @@ export const WhatsAppTemplatesView: React.FC<WhatsAppTemplatesViewProps> = ({
       titulo: 'Novo Aviso Personalizado',
       tipo: 'personalizado',
       isSystem: false,
-      mensagem: `Olá, {nome}!\n\nInformamos que sua fatura de {descricao} no valor de {valor} vence em {vencimento}.\n\n🔑 Chave PIX: {chave_pix}\n\nObrigado,\n{empresa}`,
+      mensagem: `Olá, {nome}!\n\nInformamos que sua fatura de {descricao} no valor de {valor} vence em {vencimento}.\n\n💳 Chave PIX: {chave_pix}\n\nObrigado,\n{empresa}`,
       created_at: new Date().toISOString(),
     };
 

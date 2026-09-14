@@ -188,6 +188,9 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
   const handleExportarExcel = async () => {
     try {
       setExportando(true);
+      if (onRefresh) {
+        onRefresh();
+      }
       const filtrosPayload: FiltrosRelatorio = {
         tipo: filtroTipo,
         status: (filtroStatus === 'pago' || filtroStatus === 'pendente' || filtroStatus === 'vencido') ? filtroStatus : 'todos',
@@ -195,10 +198,11 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
         dataInicio,
         dataFim,
       };
-      await exportarRelatorioExcel(filtrosPayload, parcelasParaBaixa);
+      // Exporta em tempo real puxando os recebimentos atualizados do Supabase
+      await exportarRelatorioExcel(filtrosPayload);
       notificationService.sucesso(
         'Relatório Excel Exportado!',
-        `Planilha financeira baixada com sucesso com ${parcelasParaBaixa.length} registros e análise contábil.`,
+        'Planilha executiva baixada com recebimentos em tempo real e análise contábil.',
         undefined,
         'financeiro'
       );
@@ -349,25 +353,27 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
         </div>
       </div>
 
-      {/* HEADER DO MÓDULO FINANCEIRO - MOBILE (DIRETO AO PONTO, SEM DUPLICAÇÃO) */}
-      <div className="mobile-only" style={{ marginBottom: '1rem' }}>
+      {/* HEADER DO MÓDULO FINANCEIRO - MOBILE (AÇÕES RÁPIDAS COMPACTAS) */}
+      <div className="mobile-only" style={{ marginBottom: '0.85rem' }}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
           <button
             className="btn btn-primary"
             onClick={() => setModalNovoFaturamento(true)}
             style={{
               width: '100%',
-              minHeight: '44px',
+              minHeight: '40px',
+              height: '40px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.4rem',
-              fontSize: '0.88rem',
-              fontWeight: 700,
-              padding: '0.5rem 0.75rem',
+              gap: '0.35rem',
+              fontSize: '0.82rem',
+              fontWeight: 600,
+              borderRadius: '10px',
+              padding: '0 0.65rem',
             }}
           >
-            <PlusCircle size={17} />
+            <PlusCircle size={15} />
             <span>Novo Faturamento</span>
           </button>
 
@@ -377,17 +383,19 @@ export const FinanceiroView: React.FC<FinanceiroViewProps> = ({
             disabled={exportando}
             style={{
               width: '100%',
-              minHeight: '44px',
+              minHeight: '40px',
+              height: '40px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '0.4rem',
-              fontSize: '0.88rem',
+              gap: '0.35rem',
+              fontSize: '0.82rem',
               fontWeight: 600,
-              padding: '0.5rem 0.75rem',
+              borderRadius: '10px',
+              padding: '0 0.65rem',
             }}
           >
-            <Download size={17} color="#16a34a" />
+            <Download size={15} color="#16a34a" />
             <span>{exportando ? 'Gerando...' : 'Baixar Excel'}</span>
           </button>
         </div>

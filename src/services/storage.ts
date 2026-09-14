@@ -1,5 +1,6 @@
 import { Pessoa, Conta, Parcela, Mensalidade, ConfiguracoesApp, WhatsAppTemplate } from '../types';
 import { supabase } from './supabaseClient';
+import { normalizarTextoWhatsApp } from '../utils/whatsappUtils';
 
 const STORAGE_KEYS = {
   PESSOAS: 'rr_financeiro_pessoas',
@@ -24,7 +25,7 @@ export const TEMPLATES_PADRAO: WhatsAppTemplate[] = [
     titulo: 'Fatura em atraso',
     tipo: 'em_atraso',
     isSystem: true,
-    mensagem: `Olá, {nome}! Tudo bem?\n\nConsta em nosso sistema que a fatura no valor de *{valor}*, referente a {descricao}, com vencimento em *{vencimento}*, ainda não foi compensada.\n\nCaso já tenha efetuado o pagamento, por favor desconsidere este aviso ou nos envie o comprovante por aqui.\n\n🔑 *Chave PIX:* {chave_pix}\n\nQualquer dúvida estamos à sua total disposição!\n\n_Equipe Financeira {empresa}_`,
+    mensagem: `Olá, {nome}! Tudo bem?\n\nConsta em nosso sistema que a fatura no valor de *{valor}*, referente a {descricao}, com vencimento em *{vencimento}*, ainda não foi compensada.\n\nCaso já tenha efetuado o pagamento, por favor desconsidere este aviso ou nos envie o comprovante por aqui.\n\n💳 *Chave PIX:* {chave_pix}\n\nQualquer dúvida estamos à sua total disposição!\n\n_Equipe Financeira {empresa}_`,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -32,7 +33,7 @@ export const TEMPLATES_PADRAO: WhatsAppTemplate[] = [
     titulo: 'Vencimento hoje',
     tipo: 'vence_hoje',
     isSystem: true,
-    mensagem: `Olá, {nome} ☀️\n\nLembramos que a sua fatura referente a {descricao} no valor de *{valor}* vence *HOJE ({vencimento})*.\n\nPara sua comodidade, você pode realizar o pagamento via PIX:\n🔑 *Chave PIX:* {chave_pix}\n\nAgradecemos pela pontualidade e pela parceria!\n\n_{empresa}_`,
+    mensagem: `Olá, {nome} 👋\n\nLembramos que a sua fatura referente a {descricao} no valor de *{valor}* vence *HOJE ({vencimento})*.\n\nPara sua comodidade, você pode realizar o pagamento via PIX:\n💳 *Chave PIX:* {chave_pix}\n\nAgradecemos pela pontualidade e pela parceria!\n\n_{empresa}_`,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -40,7 +41,7 @@ export const TEMPLATES_PADRAO: WhatsAppTemplate[] = [
     titulo: 'Fatura disponível',
     tipo: 'fatura_disponivel',
     isSystem: true,
-    mensagem: `Olá, {nome}!\n\nSua fatura de {descricao} no valor de *{valor}* foi emitida com sucesso em {emissao} e está disponível para quitação.\n\n📅 *Vencimento:* {vencimento}\n💰 *Valor:* {valor}\n🔑 *Chave PIX:* {chave_pix}\n\nSe precisar da segunda via ou de algum esclarecimento, estamos à disposição!\n\n_{empresa}_`,
+    mensagem: `Olá, {nome}!\n\nSua fatura de {descricao} no valor de *{valor}* foi emitida com sucesso em {emissao} e está disponível para quitação.\n\n📅 *Vencimento:* {vencimento}\n💰 *Valor:* {valor}\n💳 *Chave PIX:* {chave_pix}\n\nSe precisar da segunda via ou de algum esclarecimento, estamos à disposição!\n\n_{empresa}_`,
     created_at: '2026-01-01T00:00:00.000Z',
   },
   {
@@ -213,7 +214,7 @@ class StorageService {
           id: t.id,
           titulo: t.titulo,
           tipo: t.tipo,
-          mensagem: t.mensagem,
+          mensagem: normalizarTextoWhatsApp(t.mensagem || ''),
           isSystem: !!t.is_system,
           created_at: t.created_at,
           updated_at: t.updated_at,
@@ -494,10 +495,11 @@ class StorageService {
   public getWhatsAppTemplates(): WhatsAppTemplate[] {
     this.init();
     const stored = this.get<WhatsAppTemplate[]>(STORAGE_KEYS.TEMPLATES, TEMPLATES_PADRAO);
-    if (!stored || stored.length === 0) {
-      return TEMPLATES_PADRAO;
-    }
-    return stored;
+    const lista = (!stored || stored.length === 0) ? TEMPLATES_PADRAO : stored;
+    return lista.map((t) => ({
+      ...t,
+      mensagem: normalizarTextoWhatsApp(t.mensagem || ''),
+    }));
   }
 
   public async saveWhatsAppTemplate(template: WhatsAppTemplate): Promise<void> {
@@ -505,6 +507,7 @@ class StorageService {
     const idx = list.findIndex((t) => t.id === template.id);
     const updated = {
       ...template,
+      mensagem: normalizarTextoWhatsApp(template.mensagem || ''),
       updated_at: new Date().toISOString(),
     };
 

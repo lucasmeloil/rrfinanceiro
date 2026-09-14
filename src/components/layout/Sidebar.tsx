@@ -43,28 +43,57 @@ interface SidebarProps {
   onLogout?: () => void;
 }
 
+interface NavGroup {
+  sectionTitle?: string;
+  items: {
+    id: ActiveTab;
+    label: string;
+    icon: React.ComponentType<{ size?: number; className?: string }>;
+    badge?: number;
+  }[];
+}
+
 export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   alertasCount,
   mobileOpen = false,
   onCloseMobile,
-  onOpenSecurityModal,
   isCollapsed = false,
   onToggleCollapse,
   userEmail,
   onLogout,
 }) => {
-  const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'pessoas', label: 'Clientes & Pessoas', icon: Users },
-    { id: 'receber', label: 'Contas a Receber', icon: ArrowDownCircle },
-    { id: 'pagar', label: 'Contas a Pagar', icon: ArrowUpCircle },
-    { id: 'mensalidades', label: 'Mensalidades & Lotes', icon: CalendarDays },
-    { id: 'cobrancas', label: 'Cobranças & WhatsApp', icon: BellRing, badge: alertasCount },
-    { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
-    { id: 'config', label: 'Backup & Supabase', icon: Settings },
-    { id: 'usuarios', label: 'Gestão de Acessos', icon: UserCheck },
+  const navGroups: NavGroup[] = [
+    {
+      sectionTitle: 'VISÃO GERAL',
+      items: [
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+      ],
+    },
+    {
+      sectionTitle: 'OPERAÇÕES',
+      items: [
+        { id: 'receber', label: 'Contas a Receber', icon: ArrowDownCircle },
+        { id: 'pagar', label: 'Contas a Pagar', icon: ArrowUpCircle },
+        { id: 'mensalidades', label: 'Mensalidades & Lotes', icon: CalendarDays },
+        { id: 'cobrancas', label: 'Cobranças & WhatsApp', icon: BellRing, badge: alertasCount },
+        { id: 'pessoas', label: 'Clientes & Fornecedores', icon: Users },
+      ],
+    },
+    {
+      sectionTitle: 'CONTROLADORIA',
+      items: [
+        { id: 'financeiro', label: 'Extrato & Relatórios', icon: FileSpreadsheet },
+      ],
+    },
+    {
+      sectionTitle: 'SISTEMA',
+      items: [
+        { id: 'usuarios', label: 'Gestão de Acessos', icon: UserCheck },
+        { id: 'config', label: 'Backup & Configurações', icon: Settings },
+      ],
+    },
   ];
 
   const handleNavClick = (tabId: ActiveTab) => {
@@ -89,13 +118,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       <aside className={`sidebar ${isEffectivelyCollapsed ? 'collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`}>
         <div className="sidebar-header">
-          <div className="logo-badge" title="RR Financeiro">
-            <ShieldCheck size={22} />
-          </div>
-
-          <div className="sidebar-header-text" style={{ flex: 1, minWidth: 0 }}>
-            <div className="logo-title">RR Financeiro</div>
-            <div className="logo-subtitle">Gestão Financeira</div>
+          <div
+            className="sidebar-brand-wrapper"
+            title="RR Financeiro"
+            onClick={isEffectivelyCollapsed ? onToggleCollapse : undefined}
+            style={{ cursor: isEffectivelyCollapsed ? 'pointer' : 'default' }}
+          >
+            <div className="brand-logo-frame">
+              <img
+                src="/logo-rr.png"
+                alt="RR Financeiro"
+                className="brand-logo-img"
+              />
+            </div>
           </div>
 
           {/* Botão de Recolher/Expandir (Desktop Retrátil) */}
@@ -122,26 +157,39 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <nav className="sidebar-nav">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                className={`nav-item ${isActive ? 'active' : ''}`}
-                onClick={() => handleNavClick(item.id as ActiveTab)}
-                title={isEffectivelyCollapsed ? item.label : undefined}
-              >
-                <Icon size={20} />
-                <span>{item.label}</span>
-                {item.badge !== undefined && item.badge > 0 && (
-                  <span className="nav-badge" title={`${item.badge} alertas`}>
-                    {!isEffectivelyCollapsed && item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+          {navGroups.map((group, gIdx) => (
+            <div key={gIdx} className="sidebar-group">
+              {!isEffectivelyCollapsed && group.sectionTitle && (
+                <div className="sidebar-section-title">
+                  {group.sectionTitle}
+                </div>
+              )}
+              {isEffectivelyCollapsed && gIdx > 0 && (
+                <div className="sidebar-divider-collapsed" />
+              )}
+
+              {group.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    className={`nav-item ${isActive ? 'active' : ''}`}
+                    onClick={() => handleNavClick(item.id as ActiveTab)}
+                    title={isEffectivelyCollapsed ? item.label : undefined}
+                  >
+                    <Icon size={19} />
+                    <span>{item.label}</span>
+                    {item.badge !== undefined && item.badge > 0 && (
+                      <span className="nav-badge" title={`${item.badge} alertas`}>
+                        {!isEffectivelyCollapsed ? item.badge : ''}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </nav>
 
         <div className="sidebar-footer">

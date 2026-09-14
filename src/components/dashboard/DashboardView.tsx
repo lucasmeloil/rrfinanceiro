@@ -19,13 +19,16 @@ interface DashboardViewProps {
   onNavigateToCobrancas: () => void;
   onNavigateToReceber: () => void;
   onNavigateToPagar: () => void;
+  onNavigateToFinanceiro?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
   resumo,
+  onDarBaixa,
   onNavigateToCobrancas,
   onNavigateToReceber,
   onNavigateToPagar,
+  onNavigateToFinanceiro,
 }) => {
   const mesesFluxo = resumo.fluxoCaixa6Meses || [];
   const valoresReais = mesesFluxo.flatMap((m) => [m.receitas, m.despesas]);
@@ -152,6 +155,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               return (
                 <div
                   key={idx}
+                  onClick={() => (onNavigateToFinanceiro ? onNavigateToFinanceiro() : onNavigateToReceber())}
+                  title={`Clique para ver detalhes do mês ${item.mes}`}
                   style={{
                     flex: 1,
                     minWidth: '42px',
@@ -161,7 +166,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     height: '100%',
                     justifyContent: 'flex-end',
                     gap: '0.5rem',
+                    cursor: 'pointer',
+                    paddingBottom: '4px',
+                    borderRadius: '6px',
+                    transition: 'background 0.2s ease',
                   }}
+                  className="dashboard-bar-col"
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-end', gap: '5px', height: 180 }}>
                     {/* Barra Receita */}
@@ -315,10 +325,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         </a>
                       )}
 
+                      {onDarBaixa && (
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={() => onDarBaixa(par)}
+                          title="Dar baixa e liquidar esta parcela agora"
+                          style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        >
+                          <CheckCircle2 size={14} />
+                          <span>Baixar</span>
+                        </button>
+                      )}
+
                       <button
                         className="btn btn-secondary btn-sm"
                         onClick={par.tipoConta === 'pagar' ? onNavigateToPagar : onNavigateToReceber}
-                        title="Ver Conta para Baixa no Módulo Financeiro"
+                        title="Ver Conta no Módulo de Contas"
                       >
                         Ver Conta
                       </button>
@@ -436,6 +458,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                               <span>WhatsApp</span>
                             </a>
                           )}
+
+                          {onDarBaixa && (
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={() => onDarBaixa(par)}
+                              title="Dar baixa imediata nesta parcela"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                            >
+                              <CheckCircle2 size={14} />
+                              <span>Baixar</span>
+                            </button>
+                          )}
+
                           <button
                             className="btn btn-secondary btn-sm"
                             onClick={par.tipoConta === 'pagar' ? onNavigateToPagar : onNavigateToReceber}

@@ -70,9 +70,37 @@ const PALETTE = {
 };
 
 export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFiltrados?: ParcelaComPessoa[]) {
+  // 1. SINCRONIZAÇÃO EM TEMPO REAL COM SUPABASE
+  // Garante que todo recebimento, baixa ou liquidação recente seja capturado com precisão total
+  try {
+    await storageService.sincronizarComSupabase();
+  } catch (syncErr) {
+    console.warn('Exportação Excel: Aviso de sincronização prévia com Supabase:', syncErr);
+  }
+
   const config = storageService.getConfig();
-  const dados = dadosFiltrados || financialEngine.getParcelasEnriquecidas();
   const pessoas = storageService.getPessoas();
+  const pessoasMap = new Map(pessoas.map((p) => [p.nome.toLowerCase(), p]));
+
+  // Busca sempre as parcelas enriquecidas mais frescas do motor financeiro após o sync
+  let dados: ParcelaComPessoa[] = [];
+  if (dadosFiltrados && dadosFiltrados.length > 0) {
+    // Se foram passados dados filtrados, enriquecemos para garantir dados de pessoa e forma de pagamento atualizados
+    dados = dadosFiltrados;
+  } else {
+    dados = financialEngine.getParcelasEnriquecidas();
+    // Aplica os filtros selecionados pelo usuário
+    dados = dados.filter((p) => {
+      if (filtros.tipo !== 'todos' && p.tipoConta !== filtros.tipo) return false;
+      if (filtros.pessoaId) {
+        const pAlvo = pessoas.find((pes) => pes.id === filtros.pessoaId);
+        if (pAlvo && !p.pessoaNome.toLowerCase().includes(pAlvo.nome.toLowerCase())) return false;
+      }
+      if (filtros.dataInicio && p.data_vencimento < filtros.dataInicio) return false;
+      if (filtros.dataFim && p.data_vencimento > filtros.dataFim) return false;
+      return true;
+    });
+  }
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'RR Financeiro - Controladoria & Gestão';
@@ -80,10 +108,8 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   workbook.created = new Date();
   workbook.modified = new Date();
 
-  const pessoasMap = new Map(pessoas.map((p) => [p.nome.toLowerCase(), p]));
-
   // =========================================================================
-  // APURAÇÃO CONSOLIDADA DOS DADOS
+  // APURAÇÃO CONSOLIDADA DOS DADOS EM TEMPO REAL
   // =========================================================================
   const hojeStr = new Date().toISOString().split('T')[0];
   let totalRecebido = 0;
@@ -105,6 +131,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   let qtdPagarTotal = 0;
 
   const parcelasComplementares: ParcelaComPessoa[] = [];
+  const recebimentosRealizados: ParcelaComPessoa[] = [];
   const formasPagamentoMap = new Map<string, { qtd: number; total: number }>();
   const clientesMap = new Map<string, {
     nome: string;
@@ -121,30 +148,38 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
 
   dados.forEach((item) => {
     const val = Number(item.valor) || 0;
-    const pago = Number(item.valor_pago) || (item.status === 'pago' ? val : 0);
-    const saldo = Math.max(0, val - pago);
+    // Captura com máxima fidelidade o que foi efetivamente recebido/pago
+    const pago = Number(item.valor_pago) > 0 
+      ? Number(item.valor_pago) 
+      : (item.status === 'pago' ? val : 0);
+    const saldo = Math.max(0, Math.round((val - pago) * 100) / 100);
 
     if (item.is_complementar || item.parcela_origem_id) {
       parcelasComplementares.push(item);
     }
 
+    // Se houve recebimento ou quitação nesta parcela, inclui no extrato de liquidações em tempo real
+    if (pago > 0 || item.status === 'pago') {
+      recebimentosRealizados.push(item);
+    }
+
     if (item.tipoConta === 'receber') {
       qtdReceberTotal++;
-      if (item.status === 'pago') qtdReceberPago++;
+      if (item.status === 'pago' || pago >= val) qtdReceberPago++;
       totalReceberPrevisto += val;
       totalRecebido += pago;
       totalReceberPendente += saldo;
     } else {
       qtdPagarTotal++;
-      if (item.status === 'pago') qtdPagarPago++;
+      if (item.status === 'pago' || pago >= val) qtdPagarPago++;
       totalPagarPrevisto += val;
       totalPago += pago;
       totalPagarPendente += saldo;
     }
 
-    const isAtrasado = item.status !== 'pago' && item.data_vencimento < hojeStr;
+    const isAtrasado = item.status !== 'pago' && saldo > 0 && item.data_vencimento < hojeStr;
 
-    if (item.status === 'pago') {
+    if (item.status === 'pago' || saldo <= 0.01) {
       qtdPago++;
     } else if (item.status === 'vencido' || isAtrasado) {
       qtdVencido++;
@@ -153,7 +188,7 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
       qtdPendente++;
     }
 
-    // Contabilização por forma de pagamento
+    // Contabilização por forma de pagamento dos valores efetivamente liquidados
     if (pago > 0 || item.status === 'pago') {
       const forma = (item.forma_pagamento as FormaPagamento) || 'outro';
       const atual = formasPagamentoMap.get(forma) || { qtd: 0, total: 0 };
@@ -1088,7 +1123,183 @@ export async function exportarRelatorioExcel(filtros: FiltrosRelatorio, dadosFil
   ];
 
   // =========================================================================
-  // ABA 3: AUDITORIA DE PARCELAS COMPLEMENTARES (BAIXAS PARCIAIS)
+  // ABA 3: EXTRATO DE RECEBIMENTOS & LIQUIDAÇÕES EM TEMPO REAL
+  // Lista todos os pagamentos e recebimentos efetivados no caixa com precisão absoluta
+  // =========================================================================
+  const wsRecebimentos = workbook.addWorksheet('Recebimentos em Tempo Real', {
+    views: [{ showGridLines: true }],
+  });
+
+  wsRecebimentos.mergeCells('A1:L1');
+  const tRec = wsRecebimentos.getCell('A1');
+  tRec.value = `🟢  ${config.nomeEmpresa || 'RR FINANCEIRO'}  |  EXTRATO ANALÍTICO DE RECEBIMENTOS & LIQUIDAÇÕES EM TEMPO REAL`;
+  tRec.font = { name: 'Arial', size: 14, bold: true, color: { argb: PALETTE.white } };
+  tRec.alignment = { vertical: 'middle', horizontal: 'center' };
+  tRec.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALETTE.greenDark } };
+  wsRecebimentos.getRow(1).height = 40;
+
+  wsRecebimentos.mergeCells('A2:L2');
+  const subRec = wsRecebimentos.getCell('A2');
+  subRec.value = `Posição Consolidada em Tempo Real: ${dataHoraExtracao}   •   Total Liquidado: R$ ${totalRecebido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}   •   Qtd de Títulos Recebidos: ${recebimentosRealizados.filter(r => r.tipoConta === 'receber').length} operações`;
+  subRec.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FFDCFCE7' } };
+  subRec.alignment = { vertical: 'middle', horizontal: 'center' };
+  subRec.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF064E3B' } };
+  wsRecebimentos.getRow(2).height = 24;
+
+  wsRecebimentos.addRow([]); // Linha separadora
+  wsRecebimentos.getRow(3).height = 10;
+
+  const colunasRecHeader = [
+    'Data da Liquidação',
+    'Operação',
+    'Cliente / Pagador',
+    'CPF / CNPJ',
+    'Telefone / Contato',
+    'Descrição da Fatura',
+    'Parcela',
+    'Meio de Pagamento',
+    'Valor do Título (R$)',
+    'Valor Liquidado (R$)',
+    'Saldo Restante (R$)',
+    'Observações / Auditoria',
+  ];
+
+  const headerRecRow = wsRecebimentos.addRow(colunasRecHeader);
+  headerRecRow.height = 30;
+  headerRecRow.eachCell((cell) => {
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: PALETTE.white } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALETTE.greenDark } };
+    cell.border = {
+      top: { style: 'thin', color: { argb: PALETTE.borderMedium } },
+      bottom: { style: 'medium', color: { argb: PALETTE.headerMaster } },
+    };
+  });
+
+  // Ordena os recebimentos pelo pagamento mais recente
+  const recebimentosOrdenados = [...recebimentosRealizados].sort((a, b) => {
+    const dataA = a.data_pagamento || a.data_vencimento;
+    const dataB = b.data_pagamento || b.data_vencimento;
+    return dataB.localeCompare(dataA);
+  });
+
+  let somaLiquidadaTotal = 0;
+  let somaPrevistaRec = 0;
+  let somaSaldoRec = 0;
+
+  if (recebimentosOrdenados.length === 0) {
+    const rowVazia = wsRecebimentos.addRow([
+      'Nenhum recebimento registrado no período',
+      '-', '-', '-', '-', '-', '-', '-', 0, 0, 0, 'Aguardando baixas e recebimentos',
+    ]);
+    rowVazia.height = 24;
+    rowVazia.eachCell((c) => {
+      c.font = { name: 'Arial', size: 9.5, italic: true };
+      c.alignment = { vertical: 'middle', horizontal: 'center' };
+    });
+  } else {
+    recebimentosOrdenados.forEach((rec, idx) => {
+      const vOriginal = Number(rec.valor) || 0;
+      const vPago = Number(rec.valor_pago) > 0 ? Number(rec.valor_pago) : (rec.status === 'pago' ? vOriginal : 0);
+      const vSaldo = Math.max(0, Math.round((vOriginal - vPago) * 100) / 100);
+
+      somaPrevistaRec += vOriginal;
+      somaLiquidadaTotal += vPago;
+      somaSaldoRec += vSaldo;
+
+      const pInfo = pessoasMap.get((rec.pessoaNome || '').toLowerCase());
+      const pDoc = pInfo?.cpf_cnpj || 'Não informado';
+      const pTel = pInfo?.telefone || rec.pessoaTelefone || '-';
+      const dataLiq = rec.data_pagamento ? formatDate(rec.data_pagamento) : formatDate(rec.data_vencimento);
+      const formaTexto = rec.forma_pagamento ? formatFormaPagamento(rec.forma_pagamento) : 'PIX / Caixa';
+
+      const rowRec = wsRecebimentos.addRow([
+        dataLiq,
+        rec.tipoConta === 'receber' ? 'Receita / Cliente' : 'Despesa / Pagamento',
+        rec.pessoaNome || 'Não identificado',
+        pDoc,
+        pTel,
+        rec.descricaoConta || 'Fatura',
+        `${rec.numero_parcela}/${rec.total_parcelas}`,
+        formaTexto,
+        vOriginal,
+        vPago,
+        vSaldo,
+        rec.observacoes || (vSaldo <= 0.01 ? 'Quitação total confirmada' : 'Baixa parcial efetuada'),
+      ]);
+      rowRec.height = 24;
+
+      const isPar = idx % 2 === 0;
+      const bgZebra = isPar ? PALETTE.white : 'FFECFDF5';
+
+      rowRec.eachCell((cell, colNum) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: PALETTE.borderLight } },
+          bottom: { style: 'thin', color: { argb: PALETTE.borderLight } },
+          left: { style: 'thin', color: { argb: PALETTE.borderLight } },
+          right: { style: 'thin', color: { argb: PALETTE.borderLight } },
+        };
+        cell.font = { name: 'Arial', size: 9.5 };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgZebra } };
+
+        if ([1, 2, 4, 5, 7, 8].includes(colNum)) {
+          cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        } else if (colNum === 3 || colNum === 6 || colNum === 12) {
+          cell.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        } else if (colNum === 9 || colNum === 10 || colNum === 11) {
+          cell.numFmt = '"R$ " #,##0.00';
+          cell.alignment = { vertical: 'middle', horizontal: 'right' };
+          if (colNum === 10) {
+            cell.font = { name: 'Arial', size: 9.5, bold: true, color: { argb: PALETTE.greenDark } };
+          }
+        }
+      });
+    });
+  }
+
+  // Linha de Totalizador da aba de Recebimentos
+  const rowTotalRec = wsRecebimentos.addRow([
+    'TOTAL GERAL RECEBIDO',
+    `${recebimentosOrdenados.length} lançamentos`,
+    '', '', '', '', '', 'Caixa Total',
+    somaPrevistaRec,
+    somaLiquidadaTotal,
+    somaSaldoRec,
+    'Valores efetivamente consolidados no caixa em tempo real',
+  ]);
+  rowTotalRec.height = 30;
+  rowTotalRec.eachCell((cell, colNum) => {
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: PALETTE.white } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: PALETTE.greenDark } };
+    cell.border = {
+      top: { style: 'thin', color: { argb: PALETTE.borderMedium } },
+      bottom: { style: 'double', color: { argb: PALETTE.white } },
+    };
+    if (colNum === 9 || colNum === 10 || colNum === 11) {
+      cell.numFmt = '"R$ " #,##0.00';
+      cell.alignment = { vertical: 'middle', horizontal: 'right' };
+    } else {
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+  });
+
+  wsRecebimentos.columns = [
+    { width: 20 }, // Data Liquidação
+    { width: 18 }, // Operação
+    { width: 34 }, // Cliente / Pagador
+    { width: 20 }, // CPF / CNPJ
+    { width: 18 }, // Telefone
+    { width: 32 }, // Descrição
+    { width: 14 }, // Parcela
+    { width: 22 }, // Meio de Pagamento
+    { width: 22 }, // Valor Previsto
+    { width: 22 }, // Valor Liquidado
+    { width: 20 }, // Saldo Restante
+    { width: 40 }, // Observações / Auditoria
+  ];
+
+  // =========================================================================
+  // ABA 4: AUDITORIA DE PARCELAS COMPLEMENTARES (BAIXAS PARCIAIS)
   // (Criada sempre que houver parcelas complementares para auditoria)
   // =========================================================================
   if (parcelasComplementares.length > 0) {

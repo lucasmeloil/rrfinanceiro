@@ -40,6 +40,7 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
   const [busca, setBusca] = useState('');
   const [filtroTipo, setFiltroTipo] = useState<'todos' | 'cliente' | 'fornecedor'>('todos');
   const [modalAberto, setModalAberto] = useState(false);
+  const [abaModal, setAbaModal] = useState<'identificacao' | 'endereco' | 'financeiro' | 'fiscal'>('identificacao');
   const [pessoaEmEdicao, setPessoaEmEdicao] = useState<Pessoa | null>(null);
   const [modoVisualizacao, setModoVisualizacao] = useState<'tabela' | 'cards'>('tabela');
 
@@ -86,13 +87,8 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
   const lastSearchedCnpjRef = useRef<string>('');
   const lastSearchedCepRef = useRef<string>('');
 
-  useEffect(() => {
-    if (onOpenNovoClienteModal) {
-      abrirModal();
-    }
-  }, [onOpenNovoClienteModal]);
-
   const abrirModal = (pessoa?: Pessoa) => {
+    setAbaModal('identificacao');
     setApiFeedback(null);
     lastSearchedCnpjRef.current = '';
     lastSearchedCepRef.current = '';
@@ -113,13 +109,13 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
       setFormCidade(pessoa.cidade || '');
       setFormUf(pessoa.uf || '');
       setFormEndereco(pessoa.endereco || '');
-      setFormSituacaoCadastral(pessoa.situacao_cadastral || '');
+      setFormSituacaoCadastral(pessoa.situacao_cadastral || 'ATIVA');
       setFormCnaePrincipal(pessoa.cnae_principal || '');
       setFormNaturezaJuridica(pessoa.natureza_juridica || '');
       setFormPorte(pessoa.porte || '');
       setFormCapitalSocial(pessoa.capital_social || 0);
       setFormDataAbertura(pessoa.data_abertura || '');
-      setFormTipo(pessoa.tipo);
+      setFormTipo(pessoa.tipo || 'cliente');
       setFormDiaEmissao(pessoa.dia_emissao_mensalidade || 1);
       setFormDiaVencimento(pessoa.dia_vencimento_mensalidade || 10);
       setFormValorMensalidade(pessoa.valor_mensalidade_padrao || 0);
@@ -155,6 +151,12 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
     }
     setModalAberto(true);
   };
+
+  useEffect(() => {
+    if (onOpenNovoClienteModal) {
+      abrirModal();
+    }
+  }, [onOpenNovoClienteModal]);
 
   const handleBuscarCnpj = async (cnpjParaBuscar?: string) => {
     const raw = cnpjParaBuscar !== undefined ? cnpjParaBuscar : formCpfCnpj;
@@ -987,6 +989,42 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
                 </button>
               </div>
 
+              {/* Abas do Modal de Cadastro */}
+              <div className="modal-tabs">
+                <button
+                  type="button"
+                  className={`modal-tab-btn ${abaModal === 'identificacao' ? 'active' : ''}`}
+                  onClick={() => setAbaModal('identificacao')}
+                >
+                  <Building2 size={15} />
+                  <span>1. Identificação & Contato</span>
+                </button>
+                <button
+                  type="button"
+                  className={`modal-tab-btn ${abaModal === 'endereco' ? 'active' : ''}`}
+                  onClick={() => setAbaModal('endereco')}
+                >
+                  <MapPin size={15} />
+                  <span>2. Endereço</span>
+                </button>
+                <button
+                  type="button"
+                  className={`modal-tab-btn ${abaModal === 'financeiro' ? 'active' : ''}`}
+                  onClick={() => setAbaModal('financeiro')}
+                >
+                  <DollarSign size={15} />
+                  <span>3. Mensalidade</span>
+                </button>
+                <button
+                  type="button"
+                  className={`modal-tab-btn ${abaModal === 'fiscal' ? 'active' : ''}`}
+                  onClick={() => setAbaModal('fiscal')}
+                >
+                  <Briefcase size={15} />
+                  <span>4. Dados Fiscais</span>
+                </button>
+              </div>
+
               <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                 {apiFeedback && (
                   <div
@@ -1002,445 +1040,486 @@ export const PessoasView: React.FC<PessoasViewProps> = ({ pessoas, onRefresh, on
                   </div>
                 )}
 
-                {/* BLOCO 1: IDENTIFICAÇÃO E CONSULTA RECEITA / SEFAZ */}
-                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
-                    <Building2 size={16} color="#2563eb" />
-                    <span>Identificação Principal & Consulta CNPJ</span>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group" style={{ flex: '0 1 200px', minWidth: '140px' }}>
-                      <label className="form-label">Tipo de Cadastro</label>
-                      <select
-                        className="form-control"
-                        value={formTipo}
-                        onChange={(e: any) => setFormTipo(e.target.value)}
-                      >
-                        <option value="cliente">Cliente</option>
-                        <option value="fornecedor">Fornecedor</option>
-                        <option value="ambos">Cliente & Fornecedor</option>
-                      </select>
-                    </div>
-
-                    <div className="form-group" style={{ flex: 1, minWidth: 0 }}>
-                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span>CNPJ ou CPF *</span>
-                        <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                          {buscandoCnpj ? (
-                            <>
-                              <RefreshCw size={12} className="spin" />
-                              <span>Consultando Receita Federal & SEFAZ...</span>
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles size={12} />
-                              <span>Auto-busca ao digitar 14 dígitos</span>
-                            </>
-                          )}
-                        </span>
-                      </label>
-                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          required
-                          className="form-control"
-                          placeholder="00.000.000/0000-00 ou CPF"
-                          value={formCpfCnpj}
-                          onChange={handleCpfCnpjChange}
-                          style={{ flex: '1 1 180px', minWidth: 0 }}
-                          onPaste={(e) => {
-                            const pasted = e.clipboardData.getData('text');
-                            const clean = pasted.replace(/\D/g, '');
-                            if (clean.length === 14) {
-                              lastSearchedCnpjRef.current = clean;
-                              handleBuscarCnpj(clean);
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => {
-                            lastSearchedCnpjRef.current = '';
-                            handleBuscarCnpj();
-                          }}
-                          disabled={buscandoCnpj}
-                          title="Consultar todos os dados na Receita Federal e SEFAZ via CNPJ"
-                          style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '44px' }}
-                        >
-                          {buscandoCnpj ? (
-                            <RefreshCw size={14} className="spin" />
-                          ) : (
-                            <Sparkles size={14} color="#2563eb" />
-                          )}
-                          <span>{buscandoCnpj ? 'Buscando...' : 'Buscar CNPJ'}</span>
-                        </button>
+                {/* ABA 1: IDENTIFICAÇÃO E CONTATO */}
+                {abaModal === 'identificacao' && (
+                  <>
+                    <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
+                        <Building2 size={16} color="#2563eb" />
+                        <span>Identificação Principal & Consulta CNPJ</span>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="form-row" style={{ marginTop: '0.75rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Razão Social / Nome Oficial *</label>
-                      <input
-                        type="text"
-                        required
-                        className="form-control"
-                        placeholder="Ex: Banco do Brasil SA"
-                        value={formRazaoSocial || formNome}
-                        onChange={(e) => {
-                          setFormRazaoSocial(e.target.value);
-                          setFormNome(e.target.value);
-                        }}
-                      />
-                    </div>
+                      <div className="form-row">
+                        <div className="form-group" style={{ flex: '0 1 200px', minWidth: '140px' }}>
+                          <label className="form-label">Tipo de Cadastro</label>
+                          <select
+                            className="form-control"
+                            value={formTipo}
+                            onChange={(e: any) => setFormTipo(e.target.value)}
+                          >
+                            <option value="cliente">Cliente</option>
+                            <option value="fornecedor">Fornecedor</option>
+                            <option value="ambos">Cliente & Fornecedor</option>
+                          </select>
+                        </div>
 
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Nome Fantasia</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: Direção Geral"
-                        value={formNomeFantasia}
-                        onChange={(e) => setFormNomeFantasia(e.target.value)}
-                      />
-                    </div>
-                  </div>
+                        <div className="form-group" style={{ flex: 1, minWidth: 0 }}>
+                          <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span>CNPJ ou CPF *</span>
+                            <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                              {buscandoCnpj ? (
+                                <>
+                                  <RefreshCw size={12} className="spin" />
+                                  <span>Consultando Receita Federal & SEFAZ...</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles size={12} />
+                                  <span>Auto-busca ao digitar 14 dígitos</span>
+                                </>
+                              )}
+                            </span>
+                          </label>
+                          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                            <input
+                              type="text"
+                              required
+                              className="form-control"
+                              placeholder="00.000.000/0000-00 ou CPF"
+                              value={formCpfCnpj}
+                              onChange={handleCpfCnpjChange}
+                              style={{ flex: '1 1 180px', minWidth: 0 }}
+                              onPaste={(e) => {
+                                const pasted = e.clipboardData.getData('text');
+                                const clean = pasted.replace(/\D/g, '');
+                                if (clean.length === 14) {
+                                  lastSearchedCnpjRef.current = clean;
+                                  handleBuscarCnpj(clean);
+                                }
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                lastSearchedCnpjRef.current = '';
+                                handleBuscarCnpj();
+                              }}
+                              disabled={buscandoCnpj}
+                              title="Consultar todos os dados na Receita Federal e SEFAZ via CNPJ"
+                              style={{ whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '0.35rem', minHeight: '44px' }}
+                            >
+                              {buscandoCnpj ? (
+                                <RefreshCw size={14} className="spin" />
+                              ) : (
+                                <Sparkles size={14} color="#2563eb" />
+                              )}
+                              <span>{buscandoCnpj ? 'Buscando...' : 'Buscar CNPJ'}</span>
+                            </button>
+                          </div>
+                        </div>
+                      </div>
 
-                  <div className="form-row" style={{ marginTop: '0.75rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Inscrição Estadual (IE)</span>
-                        <span style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 600 }}>SEFAZ Estadual</span>
-                      </label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: 0809427800174 ou Isento"
-                        value={formInscricaoEstadual}
-                        onChange={(e) => setFormInscricaoEstadual(e.target.value)}
-                      />
-                    </div>
+                      <div className="form-row" style={{ marginTop: '0.75rem' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                          <label className="form-label">Razão Social / Nome Oficial *</label>
+                          <input
+                            type="text"
+                            required
+                            className="form-control"
+                            placeholder="Ex: Banco do Brasil SA"
+                            value={formRazaoSocial || formNome}
+                            onChange={(e) => {
+                              setFormRazaoSocial(e.target.value);
+                              setFormNome(e.target.value);
+                            }}
+                          />
+                        </div>
 
-                    <div className="form-group" style={{ flex: '1 1 180px' }}>
-                      <label className="form-label">Situação Cadastral</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: ATIVA"
-                        value={formSituacaoCadastral}
-                        onChange={(e) => setFormSituacaoCadastral(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                          <label className="form-label">Nome Fantasia</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Ex: Direção Geral"
+                            value={formNomeFantasia}
+                            onChange={(e) => setFormNomeFantasia(e.target.value)}
+                          />
+                        </div>
+                      </div>
 
-                {/* BLOCO 2: CONTATO & COMUNICAÇÃO */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
-                    <Phone size={16} color="#2563eb" />
-                    <span>Canais de Contato</span>
-                  </div>
+                      <div className="form-row" style={{ marginTop: '0.75rem' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                          <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span>Inscrição Estadual (IE)</span>
+                            <span style={{ fontSize: '0.7rem', color: '#0369a1', fontWeight: 600 }}>SEFAZ Estadual</span>
+                          </label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Ex: 0809427800174 ou Isento"
+                            value={formInscricaoEstadual}
+                            onChange={(e) => setFormInscricaoEstadual(e.target.value)}
+                          />
+                        </div>
 
-                  <div className="form-row">
-                    <div className="form-group">
-                      <label className="form-label">Telefone / WhatsApp</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="(XX) XXXXX-XXXX"
-                        value={formTelefone}
-                        onChange={handleTelefoneChange}
-                      />
-                    </div>
-
-                    <div className="form-group">
-                      <label className="form-label">E-mail Comercial / Financeiro</label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        placeholder="contato@empresa.com.br"
-                        value={formEmail}
-                        onChange={(e) => setFormEmail(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* BLOCO 3: LOCALIZAÇÃO & ENDEREÇO COMPLETO */}
-                <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
-                    <MapPin size={16} color="#2563eb" />
-                    <span>Endereço Completo & Localização</span>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
-                      <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
-                        <span>CEP</span>
-                        <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>
-                          {buscandoCep ? 'Buscando...' : 'Auto-busca 8 dígitos'}
-                        </span>
-                      </label>
-                      <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                        <input
-                          type="text"
-                          className="form-control"
-                          placeholder="00000-000"
-                          value={formCep}
-                          onChange={handleCepChange}
-                          style={{ flex: '1 1 120px', minWidth: 0 }}
-                          onPaste={(e) => {
-                            const pasted = e.clipboardData.getData('text');
-                            const clean = pasted.replace(/\D/g, '');
-                            if (clean.length === 8) {
-                              lastSearchedCepRef.current = clean;
-                              handleBuscarCep(clean);
-                            }
-                          }}
-                        />
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          onClick={() => {
-                            lastSearchedCepRef.current = '';
-                            handleBuscarCep();
-                          }}
-                          disabled={buscandoCep}
-                          title="Buscar endereço completo pelo CEP"
-                          style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '44px' }}
-                        >
-                          {buscandoCep ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
-                        </button>
+                        <div className="form-group" style={{ flex: '1 1 180px' }}>
+                          <label className="form-label">Situação Cadastral</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="Ex: ATIVA"
+                            value={formSituacaoCadastral}
+                            onChange={(e) => setFormSituacaoCadastral(e.target.value)}
+                          />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="form-group" style={{ flex: '2 1 200px', minWidth: 0 }}>
-                      <label className="form-label">Logradouro / Avenida / Rua</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: Avenida Paulista"
-                        value={formLogradouro}
-                        onChange={(e) => setFormLogradouro(e.target.value)}
-                      />
+                    <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
+                        <Phone size={16} color="#2563eb" />
+                        <span>Canais de Contato</span>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Telefone / WhatsApp</label>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="(XX) XXXXX-XXXX"
+                            value={formTelefone}
+                            onChange={handleTelefoneChange}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">E-mail Comercial / Financeiro</label>
+                          <input
+                            type="email"
+                            className="form-control"
+                            placeholder="contato@empresa.com.br"
+                            value={formEmail}
+                            onChange={(e) => setFormEmail(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* ABA 2: LOCALIZAÇÃO & ENDEREÇO */}
+                {abaModal === 'endereco' && (
+                  <div style={{ backgroundColor: '#ffffff', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
+                      <MapPin size={16} color="#2563eb" />
+                      <span>Endereço Completo & Localização</span>
                     </div>
 
-                    <div className="form-group" style={{ flex: '1 1 100px', minWidth: 0 }}>
-                      <label className="form-label">Número</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="1000"
-                        value={formNumero}
-                        onChange={(e) => setFormNumero(e.target.value)}
-                      />
+                    <div className="form-row">
+                      <div className="form-group" style={{ flex: '1 1 180px', minWidth: 0 }}>
+                        <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap' }}>
+                          <span>CEP</span>
+                          <span style={{ fontSize: '0.72rem', color: '#2563eb', fontWeight: 600 }}>
+                            {buscandoCep ? 'Buscando...' : 'Auto-busca 8 dígitos'}
+                          </span>
+                        </label>
+                        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <input
+                            type="text"
+                            className="form-control"
+                            placeholder="00000-000"
+                            value={formCep}
+                            onChange={handleCepChange}
+                            style={{ flex: '1 1 120px', minWidth: 0 }}
+                            onPaste={(e) => {
+                              const pasted = e.clipboardData.getData('text');
+                              const clean = pasted.replace(/\D/g, '');
+                              if (clean.length === 8) {
+                                lastSearchedCepRef.current = clean;
+                                handleBuscarCep(clean);
+                              }
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            onClick={() => {
+                              lastSearchedCepRef.current = '';
+                              handleBuscarCep();
+                            }}
+                            disabled={buscandoCep}
+                            title="Buscar endereço completo pelo CEP"
+                            style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', minHeight: '44px' }}
+                          >
+                            {buscandoCep ? <RefreshCw size={14} className="spin" /> : <Search size={14} />}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="form-group" style={{ flex: '2 1 200px', minWidth: 0 }}>
+                        <label className="form-label">Logradouro / Avenida / Rua</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: Avenida Paulista"
+                          value={formLogradouro}
+                          onChange={(e) => setFormLogradouro(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: '1 1 100px', minWidth: 0 }}>
+                        <label className="form-label">Número</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="1000"
+                          value={formNumero}
+                          onChange={(e) => setFormNumero(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-row" style={{ marginTop: '0.75rem' }}>
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Complemento</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: Sala 1204, Bloco B"
+                          value={formComplemento}
+                          onChange={(e) => setFormComplemento(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Bairro</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: Bela Vista"
+                          value={formBairro}
+                          onChange={(e) => setFormBairro(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Cidade / Município</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: São Paulo"
+                          value={formCidade}
+                          onChange={(e) => setFormCidade(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: '1 1 80px' }}>
+                        <label className="form-label">UF</label>
+                        <input
+                          type="text"
+                          maxLength={2}
+                          className="form-control"
+                          placeholder="SP"
+                          value={formUf}
+                          onChange={(e) => setFormUf(e.target.value.toUpperCase())}
+                        />
+                      </div>
                     </div>
                   </div>
+                )}
 
-                  <div className="form-row" style={{ marginTop: '0.75rem' }}>
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Complemento</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: Sala 1204, Bloco B"
-                        value={formComplemento}
-                        onChange={(e) => setFormComplemento(e.target.value)}
-                      />
+                {/* ABA 3: MENSALIDADE & COMERCIAL */}
+                {abaModal === 'financeiro' && (
+                  <>
+                    <div
+                      style={{
+                        backgroundColor: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '1rem',
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Calendar size={16} />
+                        <span>Configuração de Mensalidades do Cliente</span>
+                      </div>
+
+                      <div className="form-row">
+                        <div className="form-group">
+                          <label className="form-label">Dia de Emissão da Fatura</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            className="form-control"
+                            placeholder="Ex: 1"
+                            value={formDiaEmissao}
+                            onChange={(e) => setFormDiaEmissao(parseInt(e.target.value) || 1)}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Dia de Vencimento</label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="31"
+                            className="form-control"
+                            placeholder="Ex: 10"
+                            value={formDiaVencimento}
+                            onChange={(e) => setFormDiaVencimento(parseInt(e.target.value) || 10)}
+                          />
+                        </div>
+
+                        <div className="form-group">
+                          <label className="form-label">Valor Mensal Padrão (R$)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            className="form-control"
+                            placeholder="0.00"
+                            value={formValorMensalidade || ''}
+                            onChange={(e) => setFormValorMensalidade(parseFloat(e.target.value) || 0)}
+                          />
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Bairro</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: Bela Vista"
-                        value={formBairro}
-                        onChange={(e) => setFormBairro(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Cidade / Município</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: São Paulo"
-                        value={formCidade}
-                        onChange={(e) => setFormCidade(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ flex: '1 1 80px' }}>
-                      <label className="form-label">UF</label>
-                      <input
-                        type="text"
-                        maxLength={2}
-                        className="form-control"
-                        placeholder="SP"
-                        value={formUf}
-                        onChange={(e) => setFormUf(e.target.value.toUpperCase())}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* BLOCO 4: DADOS FISCAIS & ECONÔMICOS (RECEITA FEDERAL) */}
-                <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
-                    <Briefcase size={16} color="#2563eb" />
-                    <span>Dados Econômicos, Fiscais & Atividade</span>
-                  </div>
-
-                  <div className="form-row">
-                    <div className="form-group" style={{ flex: 2 }}>
-                      <label className="form-label">Atividade Econômica Principal (CNAE)</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: 6201-5/01 - Desenvolvimento de programas de computador"
-                        value={formCnaePrincipal}
-                        onChange={(e) => setFormCnaePrincipal(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Porte da Empresa</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: ME, EPP ou DEMAIS"
-                        value={formPorte}
-                        onChange={(e) => setFormPorte(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="form-row" style={{ marginTop: '0.75rem' }}>
-                    <div className="form-group" style={{ flex: 2 }}>
-                      <label className="form-label">Natureza Jurídica</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="Ex: Sociedade Empresária Limitada"
-                        value={formNaturezaJuridica}
-                        onChange={(e) => setFormNaturezaJuridica(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Data de Abertura</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        placeholder="YYYY-MM-DD"
-                        value={formDataAbertura}
-                        onChange={(e) => setFormDataAbertura(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="form-group" style={{ flex: 1 }}>
-                      <label className="form-label">Capital Social (R$)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        className="form-control"
-                        placeholder="0.00"
-                        value={formCapitalSocial || ''}
-                        onChange={(e) => setFormCapitalSocial(parseFloat(e.target.value) || 0)}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* BLOCO 5: CONFIGURAÇÕES DE MENSALIDADE (SE CLIENTE) */}
-                <div
-                  style={{
-                    backgroundColor: '#eff6ff',
-                    border: '1px solid #bfdbfe',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '1rem',
-                  }}
-                >
-                  <div style={{ fontWeight: 700, color: '#1e40af', fontSize: '0.9rem', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <Calendar size={16} />
-                    <span>Configuração de Mensalidades do Cliente</span>
-                  </div>
-
-                  <div className="form-row">
                     <div className="form-group">
-                      <label className="form-label">Dia de Emissão da Fatura</label>
+                      <label className="form-label">Observações Gerais / Contratuais</label>
                       <input
-                        type="number"
-                        min="1"
-                        max="31"
+                        type="text"
                         className="form-control"
-                        placeholder="Ex: 1"
-                        value={formDiaEmissao}
-                        onChange={(e) => setFormDiaEmissao(parseInt(e.target.value) || 1)}
+                        placeholder="Informações adicionais do cliente ou fornecedor"
+                        value={formObs}
+                        onChange={(e) => setFormObs(e.target.value)}
                       />
                     </div>
+                  </>
+                )}
 
-                    <div className="form-group">
-                      <label className="form-label">Dia de Vencimento</label>
-                      <input
-                        type="number"
-                        min="1"
-                        max="31"
-                        className="form-control"
-                        placeholder="Ex: 10"
-                        value={formDiaVencimento}
-                        onChange={(e) => setFormDiaVencimento(parseInt(e.target.value) || 10)}
-                      />
+                {/* ABA 4: DADOS FISCAIS & ECONÔMICOS */}
+                {abaModal === 'fiscal' && (
+                  <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 'var(--radius-md)', padding: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '0.85rem', color: '#1e293b', fontWeight: 700, fontSize: '0.9rem' }}>
+                      <Briefcase size={16} color="#2563eb" />
+                      <span>Dados Econômicos, Fiscais & Atividade</span>
                     </div>
 
-                    <div className="form-group">
-                      <label className="form-label">Valor Mensal Padrão (R$)</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        className="form-control"
-                        placeholder="0.00"
-                        value={formValorMensalidade || ''}
-                        onChange={(e) => setFormValorMensalidade(parseFloat(e.target.value) || 0)}
-                      />
+                    <div className="form-row">
+                      <div className="form-group" style={{ flex: 2 }}>
+                        <label className="form-label">Atividade Econômica Principal (CNAE)</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: 6201-5/01 - Desenvolvimento de programas de computador"
+                          value={formCnaePrincipal}
+                          onChange={(e) => setFormCnaePrincipal(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Porte da Empresa</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: ME, EPP ou DEMAIS"
+                          value={formPorte}
+                          onChange={(e) => setFormPorte(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="form-row" style={{ marginTop: '0.75rem' }}>
+                      <div className="form-group" style={{ flex: 2 }}>
+                        <label className="form-label">Natureza Jurídica</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="Ex: Sociedade Empresária Limitada"
+                          value={formNaturezaJuridica}
+                          onChange={(e) => setFormNaturezaJuridica(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Data de Abertura</label>
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="YYYY-MM-DD"
+                          value={formDataAbertura}
+                          onChange={(e) => setFormDataAbertura(e.target.value)}
+                        />
+                      </div>
+
+                      <div className="form-group" style={{ flex: 1 }}>
+                        <label className="form-label">Capital Social (R$)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="form-control"
+                          placeholder="0.00"
+                          value={formCapitalSocial || ''}
+                          onChange={(e) => setFormCapitalSocial(parseFloat(e.target.value) || 0)}
+                        />
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                {/* BLOCO 6: OBSERVAÇÕES INTERNAS */}
-                <div className="form-group">
-                  <label className="form-label">Observações Gerais / Contratuais</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="Informações adicionais do cliente ou fornecedor"
-                    value={formObs}
-                    onChange={(e) => setFormObs(e.target.value)}
-                  />
-                </div>
+                )}
               </div>
 
-              <div className="modal-footer" style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => setModalAberto(false)}
-                  style={{ minHeight: '46px', flex: '1 1 120px' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn-primary"
-                  style={{ minHeight: '46px', flex: '2 1 200px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
-                >
-                  <CheckCircle2 size={18} />
-                  <span>Salvar Cadastro Completo</span>
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  {abaModal !== 'identificacao' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        if (abaModal === 'endereco') setAbaModal('identificacao');
+                        else if (abaModal === 'financeiro') setAbaModal('endereco');
+                        else if (abaModal === 'fiscal') setAbaModal('financeiro');
+                      }}
+                    >
+                      ← Voltar
+                    </button>
+                  )}
+                  {abaModal !== 'fiscal' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        if (abaModal === 'identificacao') setAbaModal('endereco');
+                        else if (abaModal === 'endereco') setAbaModal('financeiro');
+                        else if (abaModal === 'financeiro') setAbaModal('fiscal');
+                      }}
+                    >
+                      Avançar →
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setModalAberto(false)}
+                    style={{ minHeight: '44px' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    style={{ minHeight: '44px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.45rem' }}
+                  >
+                    <CheckCircle2 size={18} />
+                    <span>Salvar Cadastro Completo</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
